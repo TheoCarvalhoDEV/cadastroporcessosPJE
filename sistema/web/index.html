@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadastro no PJe</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --cor: #2454B4; --sobre-cor: #fff;  /* cor do escritório (Configurações > Escritório) */
+    --cor-suave: color-mix(in srgb, var(--cor) 9%, #fff);
+    --cor-media: color-mix(in srgb, var(--cor) 30%, #fff);
+    --fundo: #F3F4F6; --superficie: #fff; --borda: #E2E5EA; --borda-forte: #CDD2DA;
+    --tinta: #1C2230; --tinta-2: #5B6474; --tinta-3: #8B93A1;
+    --ok: #1E7A50; --ok-fundo: #E6F4EC; --alerta: #95580A; --alerta-fundo: #FFF4DE; --alerta-borda: #F2D49A;
+    --erro: #B42318; --erro-fundo: #FDEDEB;
+    --raio: 10px;
+    --texto: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --titulo: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --mono: "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 14px/1.5 var(--texto); color: var(--tinta); background: var(--fundo); display: flex; flex-direction: column; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--cor); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  svg { flex: none; }
+
+  /* ---------- botões e campos ---------- */
+  .botao { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 14px;
+    border-radius: 8px; border: 1px solid var(--borda-forte); background: var(--superficie); cursor: pointer; font-weight: 500; white-space: nowrap; }
+  .botao:hover { background: #F7F8FA; }
+  .botao.principal { background: var(--cor); border-color: var(--cor); color: var(--sobre-cor); font-weight: 600; }
+  .botao.principal:hover { background: color-mix(in srgb, var(--cor) 88%, #000); }
+  .botao.perigo { background: var(--erro); border-color: var(--erro); color: #fff; font-weight: 600; }
+  .botao.fantasma { border-color: transparent; background: transparent; }
+  .botao.fantasma:hover { background: #EEF0F3; }
+  .botao.grande { height: 44px; width: 100%; font-size: 15px; }
+  .botao.icone { width: 36px; padding: 0; }
+  .botao:disabled { opacity: .45; cursor: default; }
+  input[type=text], input[type=password], input[type=number], input:not([type]), select {
+    height: 36px; width: 100%; padding: 0 10px; border: 1px solid var(--borda-forte); border-radius: 8px; background: var(--superficie); }
+  input:focus, select:focus { outline: 2px solid var(--cor-media); border-color: var(--cor); }
+  select.fora, input.fora { border-color: var(--alerta-borda); background: var(--alerta-fundo); }
+  label.campo { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; color: var(--tinta-2); }
+  .dica { font-size: 12.5px; color: var(--tinta-3); font-weight: 400; }
+  .pilula { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+  .pilula.ok { background: var(--ok-fundo); color: var(--ok); }
+  .pilula.alerta { background: var(--alerta-fundo); color: var(--alerta); }
+  .pilula.erro { background: var(--erro-fundo); color: var(--erro); }
+  .pilula.info { background: var(--cor-suave); color: var(--cor); }
+  .pilula.neutra { background: #EEF0F3; color: var(--tinta-2); }
+
+  /* ---------- topo ---------- */
+  .topo { height: 60px; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 20px;
+    background: var(--superficie); border-bottom: 1px solid var(--borda); }
+  .marca { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .sigla { width: 34px; height: 34px; border-radius: 9px; background: var(--cor); color: var(--sobre-cor);
+    display: grid; place-items: center; font: 700 14px var(--titulo); letter-spacing: .02em; flex: none; }
+  .marca strong { display: block; font: 600 16px/1.2 var(--titulo); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .marca small { display: block; color: var(--tinta-3); font-size: 12.5px; }
+  #status { margin-left: auto; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border-radius: 999px;
+    border: 1px solid var(--borda); background: var(--fundo); font-size: 13px; font-weight: 600; color: var(--tinta-2); cursor: default; max-width: 46vw; }
+  #status span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #status .ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--tinta-3); flex: none; }
+  #status.trabalhando { color: var(--cor); background: var(--cor-suave); border-color: var(--cor-media); }
+  #status.trabalhando .ponto { background: var(--cor); animation: pulsa 1.4s ease-in-out infinite; }
+  #status.esperando { color: var(--alerta); background: var(--alerta-fundo); border-color: var(--alerta-borda); cursor: pointer; }
+  #status.esperando .ponto { background: var(--alerta); }
+  @keyframes pulsa { 50% { opacity: .3; } }
+
+  /* ---------- tela de cadastro ---------- */
+  main { flex: 1; min-height: 0; }
+  .cadastro { display: grid; grid-template-columns: 360px 1fr; height: 100%; }
+  .lista { background: var(--superficie); border-right: 1px solid var(--borda); display: flex; flex-direction: column; min-height: 0; }
+  .lista-topo { display: flex; align-items: center; gap: 8px; padding: 16px 16px 8px 20px; }
+  .lista-topo h2 { font: 600 17px var(--titulo); margin: 0 auto 0 0; }
+  .lista-pasta { padding: 0 20px 8px; font-size: 12.5px; color: var(--tinta-3); overflow-wrap: anywhere; }
+  .grupos { flex: 1; overflow: auto; padding-bottom: 8px; }
+  .grupo h3 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 14px 20px 6px; font-size: 13px; font-weight: 600; color: var(--tinta-2); }
+  .grupo h3 .conta { font-size: 12px; color: var(--tinta-3); font-weight: 500; }
+  .grupo h3 .acao { margin-left: auto; }
+  .item { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; padding: 9px 20px 9px 17px;
+    border-left: 3px solid transparent; cursor: pointer; }
+  .item:hover { background: #F8F9FB; }
+  .item[aria-current="true"] { background: var(--cor-suave); border-left-color: var(--cor); }
+  .item input { margin: 3px 0 0; width: 16px; height: 16px; accent-color: var(--cor); }
+  .item .marcador { width: 16px; height: 16px; margin-top: 2px; display: grid; place-items: center; }
+  .item .nome { font-weight: 600; overflow-wrap: anywhere; line-height: 1.35; }
+  .item .nome small { font-weight: 500; color: var(--tinta-3); font-size: 12px; margin-left: 4px; }
+  .item .motivo { font-size: 12.5px; color: var(--tinta-2); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .item .motivo.alerta { color: var(--alerta); } .item .motivo.erro { color: var(--erro); } .item .motivo.ok { color: var(--ok); }
+  .item .motivo.info { color: var(--cor); font-weight: 600; }
+  .vazio-lista { padding: 24px 20px; color: var(--tinta-2); }
+  .lista-rodape { padding: 14px 16px 16px; border-top: 1px solid var(--borda); }
+  .lista-rodape .dica { text-align: center; margin-top: 7px; }
+
+  .conteudo { overflow: auto; padding: 24px 32px 48px; }
+  .conteudo > * { max-width: 1040px; }
+
+  /* andamento do robô */
+  .andamento { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); padding: 18px 20px; margin-bottom: 22px; }
+  .andamento h2 { font: 600 17px var(--titulo); margin: 0; }
+  .andamento .sub { color: var(--tinta-2); margin: 2px 0 0; }
+  .passos { list-style: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin: 16px 0 4px; padding: 0; }
+  .passos li { border-top: 3px solid var(--borda); padding-top: 7px; font-size: 12.5px; color: var(--tinta-3); line-height: 1.3; }
+  .passos li.feito { border-color: var(--ok); color: var(--tinta-2); }
+  .passos li.atual { border-color: var(--cor); color: var(--tinta); font-weight: 600; }
+  .ultima { font: 12.5px var(--mono); color: var(--tinta-3); margin-top: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pausa { background: var(--alerta-fundo); border-color: var(--alerta-borda); }
+  .pausa h2 { color: var(--alerta); display: flex; align-items: center; gap: 8px; }
+  .pausa .problema { margin: 8px 0 14px; max-width: 80ch; font-size: 14.5px; }
+  .pausa .botoes { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pausa img { display: block; max-width: 100%; max-height: 240px; margin-top: 14px; border: 1px solid var(--alerta-borda); border-radius: 6px; cursor: zoom-in; }
+  details.registro { margin-top: 12px; }
+  details.registro summary { cursor: pointer; color: var(--tinta-2); font-size: 13px; font-weight: 600; }
+  details.registro pre { font: 12.5px/1.55 var(--mono); max-height: 300px; overflow: auto; background: #F7F8FA; border: 1px solid var(--borda);
+    border-radius: 8px; padding: 10px 12px; margin: 8px 0 0; white-space: pre-wrap; }
+  pre .erro { color: var(--erro); } pre .pausa-l { color: var(--alerta); font-weight: 700; } pre .etapa { font-weight: 700; color: var(--tinta); } pre .ok { color: var(--ok); }
+
+  /* ficha do cliente */
+  .ficha-cabeca { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .ficha-cabeca h1 { font: 600 24px/1.2 var(--titulo); margin: 0; overflow-wrap: anywhere; }
+  .ficha-cabeca .botoes { margin-left: auto; display: flex; gap: 8px; }
+  .aviso { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-radius: var(--raio); margin-bottom: 18px;
+    background: var(--alerta-fundo); color: var(--alerta); border: 1px solid var(--alerta-borda); }
+  .aviso.erro { background: var(--erro-fundo); color: var(--erro); border-color: #F5C6C0; }
+  .aviso.ok { background: var(--ok-fundo); color: var(--ok); border-color: #BFE3CF; }
+  .aviso p { margin: 0; } .aviso ul { margin: 6px 0 0; padding-left: 18px; }
+  .secoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .secao { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); padding: 16px 18px; min-width: 0; }
+  .secao.larga { grid-column: 1 / -1; }
+  .secao > h2 { font: 600 15px var(--titulo); margin: 0 0 12px; }
+  dl.campos { display: grid; grid-template-columns: minmax(110px, 38%) 1fr; gap: 9px 14px; margin: 0; }
+  dl.campos dt { color: var(--tinta-2); }
+  dl.campos dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; min-width: 0; }
+  dl.campos .origem { display: block; font-size: 12px; font-weight: 400; color: var(--tinta-3); margin-top: 4px; line-height: 1.4; }
+  dl.campos .origem.alerta { color: var(--alerta); } dl.campos .origem.ok { color: var(--ok); }
+  .barra-ficha { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 16px;
+    background: var(--superficie); border: 1px solid var(--cor-media); border-radius: var(--raio); box-shadow: 0 -4px 16px rgba(16, 24, 40, .08); }
+  .barra-ficha span { margin-right: auto; font-weight: 600; }
+  dl.campos .falta { color: var(--alerta); font-weight: 600; }
+  dl.campos .problema dt, dl.campos dt.problema { color: var(--alerta); font-weight: 600; }
+  dl.campos dd .nota { display: block; font-size: 12.5px; font-weight: 400; color: var(--alerta); margin-top: 3px; }
+  .docs { list-style: none; margin: 0; padding: 0; }
+  .docs li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--borda); }
+  .docs li:first-child { border-top: 0; padding-top: 0; }
+  .docs li span.nome { flex: 1; overflow-wrap: anywhere; }
+  .docs svg { color: var(--tinta-3); }
+  .rodape-form { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+  .boas-vindas { max-width: 560px; margin: 8vh auto 0; text-align: center; color: var(--tinta-2); }
+  .boas-vindas h1 { font: 600 22px var(--titulo); color: var(--tinta); margin: 0 0 8px; }
+  .boas-vindas .exemplo { text-align: left; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio);
+    padding: 14px 18px; margin-top: 18px; font-size: 13.5px; line-height: 1.7; }
+  .boas-vindas .exemplo div { display: flex; gap: 8px; align-items: center; }
+  .boas-vindas .exemplo .recuo { padding-left: 26px; color: var(--tinta-2); }
+
+  /* ---------- configurações ---------- */
+  .config { display: grid; grid-template-columns: 250px 1fr; height: 100%; }
+  .config nav { background: var(--superficie); border-right: 1px solid var(--borda); padding: 14px 10px; overflow: auto; }
+  .config nav .voltar { margin: 0 0 12px; }
+  .config nav button.secao-nav { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 9px 12px; border-radius: 8px; cursor: pointer; color: var(--tinta-2); font-weight: 500; }
+  .config nav button.secao-nav:hover { background: #F4F5F7; }
+  .config nav button.secao-nav[aria-current="true"] { background: var(--cor-suave); color: var(--cor); font-weight: 600; }
+  .config .conteudo > h1 { font: 600 24px var(--titulo); margin: 0 0 4px; }
+  .config .conteudo > p.intro { color: var(--tinta-2); margin: 0 0 22px; max-width: 72ch; }
+  .cartao { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); padding: 18px 20px; margin-bottom: 16px; }
+  .cartao > h2 { font: 600 15px var(--titulo); margin: 0 0 4px; }
+  .cartao > p { color: var(--tinta-2); margin: 0 0 14px; max-width: 72ch; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px 18px; }
+  .grade .inteira { grid-column: 1 / -1; }
+  .tabela { width: 100%; border-collapse: collapse; }
+  .tabela th { text-align: left; font-size: 12.5px; color: var(--tinta-2); font-weight: 600; padding: 0 8px 6px 0; }
+  .tabela td { padding: 4px 8px 4px 0; vertical-align: middle; }
+  .tabela td:last-child { width: 1%; padding-right: 0; }
+  .tabela th:first-child { width: 58%; }
+  .tabela.dicionario th:first-child { width: 30%; } .tabela.dicionario th:nth-child(2) { width: 34%; }
+  .acao-item { border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie); margin-bottom: 10px; }
+  .acao-resumo { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; }
+  .acao-resumo .ordem { width: 24px; height: 24px; border-radius: 50%; background: var(--cor-suave); color: var(--cor); display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+  .acao-resumo .textos { flex: 1; min-width: 0; }
+  .acao-resumo strong { display: block; }
+  .acao-resumo .dica { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .acao-editor { border-top: 1px solid var(--borda); padding: 16px; display: grid; gap: 14px; }
+  .acao-editor .botoes { display: flex; gap: 8px; justify-content: flex-end; }
+  .cascata { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .coluna { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); display: flex; flex-direction: column; overflow: hidden; }
+  .coluna h3 { margin: 0; padding: 10px 12px 6px; font-size: 13px; }
+  .coluna input { border: 0; border-bottom: 1px solid var(--borda); border-radius: 0; height: 32px; font-size: 13px; }
+  .coluna input:focus { outline: none; background: var(--cor-suave); }
+  .coluna ul { list-style: none; margin: 0; padding: 4px 0; overflow: auto; height: 320px; font-size: 13px; }
+  .coluna li button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 5px 12px; cursor: pointer; line-height: 1.35; }
+  .coluna li button:hover { background: #F4F5F7; }
+  .coluna li button[aria-pressed="true"] { background: var(--cor-suave); color: var(--cor); font-weight: 600; }
+  .coluna li.texto { padding: 5px 12px; line-height: 1.35; }
+
+  .salvar-barra { position: fixed; left: 250px; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; justify-content: flex-end;
+    padding: 12px 32px; background: var(--superficie); border-top: 1px solid var(--borda); box-shadow: 0 -4px 12px rgba(16, 24, 40, .05); }
+  #msg-salvar { margin-right: auto; font-weight: 500; }
+  #toast { position: fixed; right: 20px; bottom: 20px; max-width: 460px; margin: 0; align-items: center; z-index: 5;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, .14); }
+  #toast p { flex: 1; }
+
+  @media (max-width: 920px) {
+    .cadastro, .config { grid-template-columns: 1fr; height: auto; }
+    .lista { border-right: 0; border-bottom: 1px solid var(--borda); }
+    .grupos { max-height: 50vh; }
+    .secoes, .cascata { grid-template-columns: 1fr; }
+    .conteudo { padding: 20px 16px 80px; }
+    .salvar-barra { left: 0; }
+    #status { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { #status.trabalhando .ponto { animation: none; } }
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="marca">
+    <span class="sigla" id="sigla" aria-hidden="true">PJ</span>
+    <div><strong id="nome-escritorio">Cadastro no PJe</strong><small>Cadastro de processos no PJe do TJMT</small></div>
+  </div>
+  <button id="status" type="button"><span class="ponto"></span><span id="status-texto">Robô parado</span></button>
+  <button class="botao fantasma" id="abrir-config" type="button"></button>
+</header>
+
+<main id="tela-cadastro" class="cadastro">
+  <aside class="lista" aria-label="Clientes">
+    <div class="lista-topo">
+      <h2>Clientes</h2>
+      <button class="botao icone fantasma" id="atualizar" type="button" title="Ler as pastas de novo" aria-label="Ler as pastas de novo"></button>
+    </div>
+    <div class="lista-pasta" id="lista-pasta"></div>
+    <div class="grupos" id="grupos"></div>
+    <div class="lista-rodape">
+      <button class="botao principal grande" id="cadastrar" type="button">Cadastrar</button>
+      <button class="botao perigo grande" id="parar" type="button" hidden>Parar o robô</button>
+      <div class="dica" id="rodape-dica">O robô deixa o processo como rascunho: não assina e não protocola.</div>
+    </div>
+  </aside>
+  <section class="conteudo" aria-live="polite">
+    <div id="andamento"></div>
+    <div id="ficha"></div>
+  </section>
+</main>
+
+<main id="tela-config" class="config" hidden>
+  <nav aria-label="Configurações">
+    <button class="botao fantasma voltar" id="fechar-config" type="button"></button>
+    <div id="config-nav"></div>
+  </nav>
+  <section class="conteudo" id="config-conteudo"></section>
+</main>
+
+<div class="salvar-barra" id="salvar-barra" hidden>
+  <span id="msg-salvar"></span>
+  <button class="botao" id="descartar" type="button">Desfazer</button>
+  <button class="botao principal" id="salvar" type="button">Salvar alterações</button>
+</div>
+
+<div class="aviso erro" id="toast" role="alert" hidden></div>
+<datalist id="dl-tipos-parte"></datalist>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+// cria elemento sem innerHTML: nomes de pasta e textos do PJe entram sempre como texto
+function h(tag, attrs = {}, ...filhos) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "class") e.className = v;
+    else if (k.startsWith("aria-")) e.setAttribute(k, String(v));
+    else if (v === true) e.setAttribute(k, "");
+    else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const f of filhos.flat(Infinity)) if (f != null && f !== false) e.append(f.nodeType ? f : String(f));
+  return e;
+}
+// aberta direto do arquivo (dois cliques no index.html): sem o programa por trás nada funciona
+if (location.protocol === "file:") {
+  document.body.replaceChildren(h("div", { class: "boas-vindas" },
+    h("h1", {}, "Abra pelo Abrir cadastro.bat"),
+    h("p", {}, "Esta página só funciona com o programa ligado. Na pasta do robô, dê dois cliques em \"Abrir cadastro.bat\": ele liga o programa e abre esta tela no navegador."),
+    h("p", {}, "Se o programa já estiver ligado, entre em ", h("a", { href: "http://127.0.0.1:8765/" }, "http://127.0.0.1:8765"), ".")));
+  throw new Error("Página aberta como arquivo: use o Abrir cadastro.bat.");
+}
+const ICONES = {
+  engrenagem: '<path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.8l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.8v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  recarregar: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
+  voltar: '<path d="m15 18-6-6 6-6"/>',
+  certo: '<path d="M20 6 9 17l-5-5"/>',
+  alerta: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  erro: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  arquivo: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+  pasta: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+};
+function icone(nome, tamanho = 18) {
+  const s = h("span", { "aria-hidden": "true", style: "display:inline-flex" });
+  s.innerHTML = `<svg viewBox="0 0 24 24" width="${tamanho}" height="${tamanho}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONES[nome]}</svg>`;
+  return s;
+}
+async function api(url, corpo) {
+  const r = await fetch(url, corpo === undefined ? {} :
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+  const dados = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(dados.erro || `O servidor respondeu ${r.status}.`);
+  return dados;
+}
+
+// ---------- estado ----------
+let cfg = null, mapa = { materias: {} }, clientes = [], raizClientes = "", atual = null, editando = false;
+let est = { tarefa: "", atual: "", pausa: null, resultados: {}, etapas: [] }, fila = [];
+const logLinhas = [], desmarcados = new Set();
+const TIPOS_PARTE_COMUNS = ["REQUERENTE", "EXEQUENTE", "AUTOR", "REQUERIDO", "EXECUTADO", "RÉU"];
+const SIM_NAO = ["SIM", "NÃO"];
+const SECOES_FICHA = [
+  ["Processo", [["matéria", "Matéria"], ["jurisdição", "Jurisdição"], ["competência", "Competência"],
+    ["classe judicial", "Classe judicial"], ["assunto principal", "Assunto"]]],
+  ["Características", [["valor da causa", "Valor da causa"], ["justiça gratuita", "Justiça gratuita"],
+    ["pedido de liminar ou antecipação de tutela", "Liminar ou tutela"], ["segredo de justiça", "Segredo de justiça"],
+    ["prioridade de processo", "Prioridade"]]],
+  ["Polo ativo", [["nome completo", "Nome"], ["cpf", "CPF/CNPJ"], ["pessoa ativo", "Tipo de pessoa"],
+    ["tipo ativo", "Tipo da parte"], ["endereço", "Endereço"]]],
+  ["Polo passivo", [["entidade", "Nome"], ["cnpj", "CPF/CNPJ"], ["pessoa passivo", "Tipo de pessoa"], ["tipo passivo", "Tipo da parte"]]],
+];
+const ORIGEM = { inicial: "tirado da petição inicial", corrigido: "corrigido por você", regra: "deduzido pela regra" };
+
+// ---------- opções lidas do PJe ----------
+const unir = listas => [...new Set(listas.flat())].sort((a, b) => a.localeCompare(b, "pt-BR"));
+const materias = () => Object.keys(mapa.materias || {});
+const daMateria = m => (mapa.materias || {})[m];
+const jurisdicoesDe = m => daMateria(m) ? Object.keys(daMateria(m).jurisdicoes) : unir(materias().map(x => Object.keys(daMateria(x).jurisdicoes)));
+// sem matéria escolhida, as listas juntam as de todas as matérias
+const doMapa = m => daMateria(m) ? [daMateria(m)] : Object.values(mapa.materias || {});
+const competenciasDe = (m, j) => {
+  const daJurisdicao = j ? unir(doMapa(m).map(x => x.jurisdicoes[j] || [])) : [];
+  return daJurisdicao.length ? daJurisdicao : unir(doMapa(m).map(x => Object.values(x.jurisdicoes).flat()));
+};
+const classesDe = (m, c) => {
+  const daCompetencia = c ? unir(doMapa(m).map(x => x.classes[c] || [])) : [];
+  return daCompetencia.length ? daCompetencia : unir(doMapa(m).map(x => Object.values(x.classes).flat()));
+};
+const rasc = () => mapa.rascunho || {};
+// a lista de tipos dos anexos só aparece no PJe depois de enviar a inicial (não foi lida); estes dois o robô já usa lá
+const tiposDocumento = () => unir([rasc().tipos_documento || [], ["Documento de Identificação", "Documento de comprovação"]]);
+// mesma comparação do robô: sem acento, maiúscula, pontuação e "e/de/da/do"
+const parecido = t => (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9 ]/g, " ")
+  .split(/\s+/).filter(p => p && !["E", "DE", "DA", "DO", "DAS", "DOS"].includes(p)).join(" ");
+function acharOpcao(opcoes, valor) {
+  if (!valor) return "";
+  const codigo = (valor.match(/\((\d+)\)\s*$/) || [])[1];
+  return opcoes.find(o => o === valor) || (codigo && opcoes.find(o => o.endsWith(`(${codigo})`)))
+    || opcoes.find(o => parecido(o) === parecido(valor)) || null;
+}
+// lista de escolha com as opções do PJe; valor que não está lá continua escolhido, marcado em amarelo
+function escolha(nome, valor, opcoes, { vazio = "Escolha", aoMudar } = {}) {
+  if (!opcoes.length) return h("input", { name: nome, value: valor || "", oninput: aoMudar });
+  const s = h("select", { name: nome, onchange: aoMudar });
+  preencherEscolha(s, valor, opcoes, vazio);
+  return s;
+}
+function preencherEscolha(s, valor, opcoes, vazio = "Escolha") {
+  const achada = acharOpcao(opcoes, valor);
+  s.replaceChildren(h("option", { value: "" }, vazio),
+    ...(valor && achada === null ? [h("option", { value: valor }, `${valor} (não está nas opções do PJe)`)] : []),
+    ...opcoes.map(o => h("option", { value: o }, o)));
+  s.value = achada === null ? valor : achada || "";
+  s.classList.toggle("fora", !!valor && achada === null);
+}
+
+// ---------- topo e identidade ----------
+function aplicarIdentidade() {
+  const cor = /^#[0-9a-f]{6}$/i.test(cfg.cor || "") ? cfg.cor : "#2454B4";
+  const raiz = document.documentElement.style;
+  raiz.setProperty("--cor", cor);
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(cor.slice(i, i + 2), 16) / 255)
+    .map(c => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  raiz.setProperty("--sobre-cor", 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#1C2230" : "#fff");  // cor clara: texto escuro
+  const nome = (cfg.nome || "").trim();
+  $("#nome-escritorio").textContent = nome || "Cadastro no PJe";
+  $("#sigla").textContent = nome ? nome.split(/\s+/).filter(p => p.length > 2 || /^[A-Z]{2,}$/.test(p)).slice(0, 2).map(p => p[0]).join("").toUpperCase() || nome[0].toUpperCase() : "PJ";
+  document.title = (nome ? nome + ": " : "") + "Cadastro no PJe";
+}
+$("#abrir-config").append(icone("engrenagem"), "Configurações");
+$("#fechar-config").append(icone("voltar"), "Voltar ao cadastro");
+$("#atualizar").append(icone("recarregar"));
+$("#abrir-config").addEventListener("click", () => mostrarTela("config"));
+$("#fechar-config").addEventListener("click", () => mostrarTela("cadastro"));
+$("#status").addEventListener("click", () => { if (est.pausa) mostrarTela("cadastro"); });
+function mostrarTela(qual) {
+  $("#tela-cadastro").hidden = qual !== "cadastro";
+  $("#tela-config").hidden = qual !== "config";
+  $("#abrir-config").hidden = qual === "config";
+  if (qual === "config") desenharConfig();
+  mostrarBarraSalvar();
+}
+
+// ---------- lista de clientes ----------
+const partesDoNome = n => { const m = n.match(/^(.*?)\s*\[(.*)\]\s*$/); return m ? [m[1], m[2]] : [n, ""]; };
+function situacaoDe(nome) {
+  if (est.atual === nome) return est.pausa ? "pausado" : "processando";
+  if (est.tarefa === "cadastrar" && fila.includes(nome) && !est.resultados[nome]) return "fila";
+  const r = est.resultados[nome];
+  if (r) return r.situacao;
+  return (clientes.find(c => c.nome === nome) || {}).situacao || "pronto";
+}
+async function carregarClientes() {
+  $("#grupos").replaceChildren(h("div", { class: "vazio-lista" }, "Lendo as pastas..."));
+  try {
+    const r = await api("/api/clientes");
+    clientes = r.clientes; raizClientes = r.raiz;
+  } catch (e) { clientes = []; avisar(e.message); }
+  $("#lista-pasta").replaceChildren(icone("pasta", 13), " ", raizClientes);
+  desenharLista();
+  if (atual && !editando && (clientes.some(c => c.nome === atual) || est.resultados[atual])) abrirCliente(atual);
+  if (!atual) desenharBoasVindas();
+}
+// pronto = a pasta passou na conferência; inclui quem deu erro no PJe e já pode tentar de novo
+const prontos = () => clientes.filter(c => c.situacao === "pronto" && (est.resultados[c.nome] || {}).situacao !== "concluido"
+  && !(est.tarefa === "cadastrar" && (fila.includes(c.nome) || est.atual === c.nome)));
+const selecionados = () => prontos().filter(c => !desmarcados.has(c.nome)).map(c => c.nome);
+function itemDaLista(nome, { marcavel, motivo, classeMotivo }) {
+  const [principal, extra] = partesDoNome(nome);
+  const s = situacaoDe(nome);
+  const marcador = marcavel
+    ? h("input", { type: "checkbox", "aria-label": "Incluir " + nome + " no próximo cadastro", checked: !desmarcados.has(nome), disabled: !!est.tarefa,
+        onclick: ev => ev.stopPropagation(), onchange: ev => { ev.target.checked ? desmarcados.delete(nome) : desmarcados.add(nome); desenharRodape(); } })
+    : h("span", { class: "marcador", style: `color:var(--${{ concluido: "ok", erro: "erro", problema: "alerta", pausado: "alerta" }[s] || "cor"})` },
+        icone({ concluido: "certo", erro: "erro", problema: "alerta", pausado: "alerta", fila: "relogio" }[s] || "relogio", 15));
+  return h("div", { class: "item", role: "button", tabindex: "0", "aria-current": atual === nome,
+      onclick: () => abrirCliente(nome), onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); abrirCliente(nome); } } },
+    marcador,
+    h("div", {}, h("div", { class: "nome" }, principal, extra ? h("small", {}, extra) : null),
+      motivo ? h("div", { class: "motivo " + (classeMotivo || "") }, motivo) : null));
+}
+function desenharLista() {
+  const grupos = [];
+  const grupo = (titulo, itens, acao) => itens.length && grupos.push(h("section", { class: "grupo" },
+    h("h3", {}, titulo, h("span", { class: "conta" }, itens.length), acao || null), itens));
+  if (est.tarefa === "cadastrar") {
+    const agora = [...new Set([...(est.atual ? [est.atual] : []), ...fila])].filter(n => !est.resultados[n]);
+    grupo("Cadastrando agora", agora.map(n => itemDaLista(n, {
+      motivo: situacaoDe(n) === "pausado" ? "Esperando você" : situacaoDe(n) === "processando" ? "No PJe agora" : "Na fila",
+      classeMotivo: situacaoDe(n) === "pausado" ? "alerta" : "info" })));
+  }
+  const lista = prontos(), todosMarcados = lista.every(c => !desmarcados.has(c.nome));
+  grupo("Prontos para cadastrar", lista.map(c => {
+      const r = est.resultados[c.nome];
+      return itemDaLista(c.nome, { marcavel: true, motivo: r ? "A última tentativa parou: " + r.msg : "", classeMotivo: "erro" });
+    }),
+    lista.length > 1 && !est.tarefa ? h("button", { class: "botao fantasma acao", style: "height:26px;padding:0 8px;font-size:12.5px", type: "button",
+      onclick: () => { lista.forEach(c => todosMarcados ? desmarcados.add(c.nome) : desmarcados.delete(c.nome)); desenharLista(); } },
+      todosMarcados ? "Desmarcar todos" : "Marcar todos") : null);
+  grupo("Falta conferir", clientes.filter(c => c.situacao === "problema")
+    .map(c => itemDaLista(c.nome, { motivo: c.problema, classeMotivo: "alerta" })));
+  grupo("Cadastrados agora", Object.entries(est.resultados).filter(([, r]) => r.situacao === "concluido")
+    .map(([n]) => itemDaLista(n, { motivo: "Rascunho pronto no PJe", classeMotivo: "ok" })));
+  $("#grupos").replaceChildren(...(grupos.length ? grupos : [h("div", { class: "vazio-lista" },
+    "Nenhuma pasta de cliente nesta pasta. Crie uma pasta por cliente com a petição inicial e os anexos em PDF.")]));
+  desenharRodape();
+}
+function desenharRodape() {
+  const n = selecionados().length, ocupado = !!est.tarefa;
+  $("#cadastrar").hidden = ocupado; $("#parar").hidden = !ocupado || est.tarefa !== "cadastrar";
+  $("#cadastrar").disabled = !n;
+  $("#cadastrar").textContent = n ? `Cadastrar ${n} ${n === 1 ? "cliente" : "clientes"}` : "Nenhum cliente marcado";
+  $("#atualizar").disabled = ocupado;
+  $("#rodape-dica").textContent = est.tarefa === "mapear" ? "O robô está lendo as opções do PJe. Espere terminar para cadastrar."
+    : "O robô deixa o processo como rascunho: não assina e não protocola.";
+}
+$("#atualizar").addEventListener("click", carregarClientes);
+$("#cadastrar").addEventListener("click", async () => {
+  const nomes = selecionados();
+  try {
+    await api("/api/cadastrar", { clientes: nomes });
+    fila = nomes;
+    await atualizarEstado();
+  } catch (e) { avisar(e.message); }
+});
+$("#parar").addEventListener("click", async () => {
+  if (confirm("Parar o robô? O cliente que está no PJe fica como rascunho incompleto e volta para a lista.")) await api("/api/parar", {});
+});
+
+// ---------- ficha do cliente ----------
+function desenharBoasVindas() {
+  $("#ficha").replaceChildren(h("div", { class: "boas-vindas" },
+    h("h1", {}, clientes.length ? "Escolha um cliente na lista" : "Nenhum cliente para cadastrar"),
+    h("p", {}, clientes.length ? "Você vê aqui os dados que o robô vai usar no PJe e pode corrigir o que estiver errado antes de cadastrar."
+      : "Cada cliente é uma pasta dentro da pasta de clientes. O robô lê a petição inicial e, se houver, o documento de cadastro (.docx)."),
+    h("div", { class: "exemplo" },
+      h("div", {}, icone("pasta", 16), h("strong", {}, "Maria da Silva [FGTS]")),
+      [["Maria da Silva [Ação de Cobrança].pdf", "petição inicial"],
+       [`${(cfg && cfg.prefixo_anexo) || "DOC"} 01] Documentos pessoais.pdf`, "1º anexo"],
+       [`${(cfg && cfg.prefixo_anexo) || "DOC"} 02] Holerites.pdf`, "2º anexo"],
+       ["Cadastro de Ação Judicial - Maria da Silva.docx", "opcional"]].map(([arquivo, papel]) =>
+        h("div", { class: "recuo" }, icone("arquivo", 14), h("span", { style: "flex:1" }, arquivo), h("span", { class: "dica" }, papel))))));
+}
+async function abrirCliente(nome) {
+  atual = nome; editando = false; desenharLista();
+  const res = est.resultados[nome];
+  if (res && res.situacao === "concluido" && !clientes.some(c => c.nome === nome)) return desenharConcluido(nome, res);
+  let r;
+  try { r = await api("/api/clientes/" + encodeURIComponent(nome)); }
+  catch (e) { $("#ficha").replaceChildren(h("div", { class: "aviso erro" }, icone("erro"), h("p", {}, e.message))); return; }
+  if (atual !== nome || editando) return;
+  desenharFicha(nome, r);
+}
+// de onde veio o valor: correção, .docx, o que o robô achou na inicial (motivo) ou nada
+function origemDoCampo(c, motivo) {
+  if (c.corrigido) return ["ok", "corrigido por você"];
+  if (c.diverge) return ["alerta", `O .docx diz "${c.docx}" e a inicial diz "${c.inicial}". Vale o .docx; confira.`];
+  if (c.docx) return ["", c.inicial ? "do .docx; a petição inicial diz o mesmo" : "do documento de cadastro (.docx)"];
+  if (motivo) return [/palpite|padrão/.test(motivo) ? "alerta" : "", motivo.charAt(0).toUpperCase() + motivo.slice(1)];
+  if (c.inicial) return ["", "tirado da petição inicial"];
+  return c.falta ? ["alerta", "O robô não achou na inicial: preencha."] : ["", "Não informado na inicial."];
+}
+// a ficha já é o formulário: cada campo mostra o que o robô achou e pode ser trocado ali mesmo
+function desenharFicha(nome, r) {
+  const [principal, extra] = partesDoNome(nome);
+  const s = situacaoDe(nome), res = est.resultados[nome], ocupado = est.atual === nome;
+  const pilula = { pronto: ["ok", "Pronto para cadastrar"], problema: ["alerta", "Falta conferir"], erro: ["erro", "O último cadastro parou"],
+    processando: ["info", "No PJe agora"], pausado: ["alerta", "Esperando você"], fila: ["info", "Na fila"], concluido: ["ok", "Cadastrado"] }[s];
+  const campos = Object.fromEntries(r.campos.map(c => [c.chave, c]));
+  const dados = r.dados ? r.dados.dados : {};
+  const valor = chave => (campos[chave] || {}).atual || dados[chave] || "";
+  const controles = {};
+  const pj = (chave, opcoes, extra) => (controles[chave] = escolha(chave, valor(chave), opcoes, extra));
+  // matéria > jurisdição > competência > classe: cada lista mostra só o que o PJe oferece para a escolha anterior
+  const refazerCascata = () => {
+    const m = controles["matéria"].value, j = controles["jurisdição"], c = controles["competência"], k = controles["classe judicial"];
+    if (j.tagName === "SELECT") preencherEscolha(j, j.value, jurisdicoesDe(m));
+    if (c.tagName === "SELECT") preencherEscolha(c, c.value, competenciasDe(m, j.value));
+    if (k.tagName === "SELECT") preencherEscolha(k, k.value, classesDe(m, c.value));
+  };
+  const m0 = acharOpcao(materias(), valor("matéria")) || "";
+  const montar = chave => {
+    if (chave === "matéria") return pj(chave, materias(), { aoMudar: refazerCascata });
+    if (chave === "jurisdição") return pj(chave, jurisdicoesDe(m0), { aoMudar: refazerCascata });
+    if (chave === "competência") return pj(chave, competenciasDe(m0, acharOpcao(jurisdicoesDe(m0), valor("jurisdição"))), { aoMudar: refazerCascata });
+    if (chave === "classe judicial") return pj(chave, classesDe(m0, acharOpcao(competenciasDe(m0), valor("competência"))));
+    if (chave.startsWith("pessoa ")) return pj(chave, cfg.pessoas);
+    if (["justiça gratuita", "pedido de liminar ou antecipação de tutela", "segredo de justiça"].includes(chave)) return pj(chave, SIM_NAO);
+    if (chave === "prioridade de processo") {  // "Não aplicável" no .docx = nenhuma prioridade
+      const v = /^(NAO|NENHUM)/.test(parecido(valor(chave))) ? "" : valor(chave);
+      return (controles[chave] = escolha(chave, v, rasc().prioridades || [], { vazio: "Nenhuma" }));
+    }
+    const attrs = { name: chave, value: valor(chave) };
+    if (chave.startsWith("tipo ")) attrs.list = "dl-tipos-parte";
+    if (["cpf", "cnpj", "valor da causa"].includes(chave)) attrs.inputmode = "numeric";
+    return (controles[chave] = h("input", attrs));
+  };
+  const erro = h("div", { class: "aviso erro", hidden: true });
+  const barra = h("div", { class: "barra-ficha", hidden: true },
+    h("span", {}, "Você mudou dados deste cliente."),
+    h("button", { class: "botao", type: "button", onclick: () => abrirCliente(nome) }, "Desfazer"),
+    h("button", { class: "botao principal", type: "submit" }, "Salvar alterações"));
+  const form = h("form", {
+      oninput: () => { editando = true; barra.hidden = false; }, onchange: () => { editando = true; barra.hidden = false; },
+      onsubmit: async ev => {
+        ev.preventDefault();
+        try {
+          await api("/api/clientes/" + encodeURIComponent(nome) + "/corrigir", Object.fromEntries(new FormData(form)));
+          editando = false;
+          await carregarClientes();
+          abrirCliente(nome);
+        } catch (e) { erro.replaceChildren(icone("erro"), h("p", {}, e.message)); erro.hidden = false; erro.scrollIntoView({ block: "nearest" }); }
+      } },
+    h("fieldset", { disabled: ocupado, style: "border:0;margin:0;padding:0;min-width:0" },
+      h("div", { class: "secoes" }, SECOES_FICHA.map(([titulo, lista]) => h("section", { class: "secao" }, h("h2", {}, titulo),
+        h("dl", { class: "campos" }, lista.map(([chave, rotulo]) => {
+          const c = campos[chave] || {};
+          const [tom, texto] = origemDoCampo(c, (r.motivos || {})[chave]);
+          return [h("dt", { class: tom === "alerta" ? "problema" : "" }, h("label", { for: "c-" + chave }, rotulo)),
+            h("dd", {}, (() => { const e = montar(chave); e.id = "c-" + chave; return e; })(),
+              h("span", { class: "origem " + tom }, texto))];
+        }))))),
+      r.dados ? h("section", { class: "secao", style: "margin-top:16px" }, h("h2", {}, "Documentos que vão para o PJe"),
+        h("ul", { class: "docs" },
+          h("li", {}, icone("arquivo"), h("span", { class: "nome" }, r.dados.inicial), h("span", { class: "pilula info" }, "Petição inicial")),
+          r.dados.anexos.map(a => h("li", {}, icone("arquivo"), h("span", { class: "nome" }, a.nome), h("span", { class: "pilula neutra" }, a.tipo))))) : null),
+    erro, barra);
+  $("#ficha").replaceChildren(h("div", {},
+    h("div", { class: "ficha-cabeca" }, h("h1", {}, principal), extra ? h("span", { class: "pilula neutra" }, extra) : null,
+      pilula ? h("span", { class: "pilula " + pilula[0] }, pilula[1]) : null),
+    res && res.situacao === "erro" ? h("div", { class: "aviso erro" }, icone("erro"), h("div", {}, h("p", {}, h("strong", {}, "O último cadastro parou. "), res.msg),
+      h("p", { class: "dica" }, "Corrija o que for preciso e cadastre de novo: o robô continua o rascunho que já existe."))) : null,
+    r.problema ? h("div", { class: "aviso" }, icone("alerta"), h("p", {}, r.problema)) : null,
+    r.rascunho ? h("div", { class: "aviso", style: "background:var(--cor-suave);color:var(--tinta);border-color:var(--cor-media)" },
+      icone("arquivo"), h("p", {}, `Este cliente já tem o rascunho ${r.rascunho} no PJe. O próximo cadastro continua dele, sem criar outro.`)) : null,
+    r.campos.length ? h("p", { class: "dica", style: "margin:-6px 0 14px" },
+      "Confira o que o robô achou e mude o que precisar. A mudança fica guardada na pasta do cliente; o .docx e a inicial não mudam.") : null,
+    r.campos.length ? form : null));
+}
+function desenharConcluido(nome, res) {
+  const [principal] = partesDoNome(nome);
+  $("#ficha").replaceChildren(h("div", {},
+    h("div", { class: "ficha-cabeca" }, h("h1", {}, principal), h("span", { class: "pilula ok" }, "Cadastrado")),
+    h("div", { class: "aviso ok" }, icone("certo"), h("div", {}, h("p", {}, "Rascunho pronto no PJe. ", res.msg),
+      h("p", { class: "dica" }, "Confira no PJe, assine e protocole. O robô não assina nem protocola."))),
+    res.pendencias && res.pendencias.length ? h("section", { class: "secao" }, h("h2", {}, "Confira antes de protocolar"),
+      h("ul", { style: "margin:0;padding-left:18px;line-height:1.7" }, res.pendencias.map(p => h("li", {}, p)))) : null));
+}
+
+
+// ---------- andamento do robô ----------
+const registro = h("pre", {});
+const detalhes = h("details", { class: "registro" }, h("summary", {}, "Registro detalhado do robô"), registro);
+let modoAndamento = "", partesAndamento = {};
+function classeDaLinha(l) {
+  return /ERRO|Parou:/.test(l) ? "erro" : /PAUSADO/.test(l) ? "pausa-l" : /== Etapa|===== Cliente/.test(l) ? "etapa"
+    : /concluída|Login OK|Pronto\.|pronto:/.test(l) ? "ok" : "";
+}
+function etapaAtual() {
+  let inicio = logLinhas.length - 1;
+  while (inicio >= 0 && !logLinhas[inicio].includes("===== Cliente:")) inicio--;
+  let atualN = 0, feitas = 0;
+  for (let i = Math.max(inicio, 0); i < logLinhas.length; i++) {
+    const a = logLinhas[i].match(/== Etapa (\d+)\/\d+:/), f = logLinhas[i].match(/Etapa (\d+)\/\d+ concluída/);
+    if (a) atualN = +a[1];
+    if (f) feitas = +f[1];
+  }
+  return { atualN, feitas };
+}
+function desenharAndamento() {
+  const p = est.pausa;
+  const modo = p ? "pausa" + p.etapa + p.problema : est.tarefa || (logLinhas.length ? "parado" : "");
+  if (modo !== modoAndamento) {
+    modoAndamento = modo; partesAndamento = {};
+    const caixa = $("#andamento");
+    if (!modo) return caixa.replaceChildren();
+    if (p) {
+      const responder = resposta => api("/api/responder", { resposta }).catch(e => avisar(e.message));
+      caixa.replaceChildren(h("section", { class: "andamento pausa" },
+        h("h2", {}, icone("alerta", 20), `O robô parou e precisa de você`),
+        h("p", { class: "sub" }, `${partesDoNome(est.atual)[0]}: etapa ${p.etapa} de ${est.etapas.length} (${p.nome})`),
+        h("p", { class: "problema" }, p.problema),
+        h("div", { class: "botoes" },
+          h("button", { class: "botao principal", type: "button", onclick: () => responder("repetir") }, "Tentar de novo"),
+          h("button", { class: "botao", type: "button", onclick: () => responder("continuar") }, "Já fiz no PJe, continuar"),
+          h("button", { class: "botao", type: "button", onclick: () => responder("pular") }, "Pular este cliente")),
+        p.foto ? h("img", { src: "/api/foto/" + encodeURIComponent(p.foto), alt: "Como estava a tela do PJe quando o robô parou",
+          onclick: () => window.open("/api/foto/" + encodeURIComponent(p.foto)) }) : null,
+        detalhes));
+      mostrarTela("cadastro");
+      $("#andamento").scrollIntoView({ block: "start" });
+      return;
+    }
+    partesAndamento.titulo = h("h2", {});
+    partesAndamento.sub = h("p", { class: "sub" });
+    partesAndamento.passos = h("ol", { class: "passos" });
+    partesAndamento.ultima = h("div", { class: "ultima" });
+    caixa.replaceChildren(h("section", { class: "andamento" }, partesAndamento.titulo, partesAndamento.sub,
+      est.tarefa === "cadastrar" ? partesAndamento.passos : null, est.tarefa ? partesAndamento.ultima : null, detalhes));
+  }
+  if (p || !modo) return;
+  const ultima = logLinhas.length ? logLinhas[logLinhas.length - 1].replace(/^\[\d\d:\d\d:\d\d\]\s*/, "") : "";
+  if (est.tarefa === "cadastrar") {
+    const pos = fila.indexOf(est.atual) + 1;
+    partesAndamento.titulo.textContent = est.atual ? `Cadastrando ${partesDoNome(est.atual)[0]}` : "Entrando no PJe...";
+    partesAndamento.sub.textContent = fila.length > 1 && pos ? `Cliente ${pos} de ${fila.length}. Pode acompanhar no Chrome do robô.` : "Pode acompanhar no Chrome do robô.";
+    const { atualN, feitas } = etapaAtual();
+    partesAndamento.passos.replaceChildren(...est.etapas.map((nome, i) =>
+      h("li", { class: i + 1 <= feitas ? "feito" : i + 1 === atualN ? "atual" : "" }, `${i + 1}. ${nome}`)));
+  } else if (est.tarefa === "mapear") {
+    const prog = [...logLinhas].reverse().map(l => l.match(/\((\d+)\/(\d+)\) (.+?):/)).find(Boolean);
+    partesAndamento.titulo.textContent = "Lendo as opções do PJe";
+    partesAndamento.sub.textContent = prog ? `Matéria ${prog[1]} de ${prog[2]}: ${prog[3]}` : "Entrando no PJe...";
+  } else {
+    partesAndamento.titulo.textContent = "Robô parado";
+    partesAndamento.sub.textContent = "O registro do que ele fez nesta sessão está abaixo.";
+  }
+  partesAndamento.ultima.textContent = ultima;
+}
+async function atualizarEstado() {
+  let r;
+  try { r = await api("/api/estado?desde=" + logLinhas.length); }
+  catch { $("#status").className = "esperando"; $("#status-texto").textContent = "Sem conexão: abra o programa de novo"; return; }
+  const noFim = registro.scrollTop + registro.clientHeight >= registro.scrollHeight - 30;
+  logLinhas.push(...r.log);
+  registro.append(...r.log.map(l => h("span", { class: classeDaLinha(l) }, l + "\n")));
+  if (noFim) registro.scrollTop = registro.scrollHeight;
+  const tarefaAntes = est.tarefa, atualAntes = est.atual, resultadosAntes = Object.keys(est.resultados).length;
+  est = r;
+  $("#status").className = r.pausa ? "esperando" : r.tarefa ? "trabalhando" : "";
+  $("#status-texto").textContent = r.pausa ? "Esperando você" : r.tarefa === "mapear" ? "Lendo as opções do PJe"
+    : r.tarefa === "cadastrar" ? (r.atual ? "Cadastrando " + partesDoNome(r.atual)[0] : "Entrando no PJe") : "Robô parado";
+  desenharAndamento();
+  if (tarefaAntes !== r.tarefa || atualAntes !== r.atual || resultadosAntes !== Object.keys(r.resultados).length || r.pausa) desenharLista();
+  if (tarefaAntes && !r.tarefa) tarefaAntes === "mapear" ? carregarMapa() : carregarClientes();
+}
+
+// ---------- configurações ----------
+let rotulos = [], partes = [], dicionario = [], secao = "escritorio", haMudancas = false;
+const SECOES_CONFIG = [
+  ["escritorio", "Escritório"], ["login", "Login do PJe"], ["documentos", "Pastas e documentos"],
+  ["padrao", "Padrão do escritório"], ["dicionario", "Dicionário"], ["partes", "Réus conhecidos"], ["pje", "Opções do PJe"]];
+function desenharConfig() {
+  $("#config-nav").replaceChildren(...SECOES_CONFIG.map(([chave, nome]) =>
+    h("button", { class: "secao-nav", type: "button", "aria-current": secao === chave, onclick: () => { secao = chave; desenharConfig(); } }, nome)));
+  const conteudo = { escritorio: cfgEscritorio, login: cfgLogin, documentos: cfgDocumentos, padrao: cfgPadrao,
+    dicionario: cfgDicionario, partes: cfgPartes, pje: cfgPje }[secao]();
+  $("#config-conteudo").replaceChildren(...conteudo.filter(Boolean));
+}
+// campo ligado ao cfg: muda o valor e marca que há o que salvar
+function ligado(chave, attrs = {}, tratar = v => v, depois) {
+  return h("input", { value: cfg[chave] ?? "", ...attrs, oninput: ev => { cfg[chave] = tratar(ev.target.value); mudou(); if (depois) depois(); } });
+}
+function campo(rotulo, controle, dica) { return h("label", { class: "campo" }, rotulo, controle, dica ? h("span", { class: "dica" }, dica) : null); }
+function cfgEscritorio() {
+  return [h("h1", {}, "Escritório"), h("p", { class: "intro" }, "Como o programa se apresenta para quem usa. Tudo fica só neste computador."),
+    h("div", { class: "cartao" }, h("div", { class: "grade" },
+      campo("Nome do escritório", ligado("nome", { placeholder: "ex.: Silva & Souza Advogados" }, v => v, aplicarIdentidade)),
+      campo("Cor do escritório", ligado("cor", { type: "color", style: "height:36px;padding:2px 4px" }, v => v, aplicarIdentidade),
+        "Aparece no símbolo e nos botões principais."))),
+    h("div", { class: "cartao" }, h("h2", {}, "Robô"), h("div", { class: "grade" },
+      campo("Pausa entre as ações (segundos)", ligado("pausa_segundos", { type: "number", min: 0, max: 10, step: 0.5 }, Number),
+        "Mais tempo deixa acompanhar no Chrome. 0 é o mais rápido."),
+      campo("Raça/cor quando a inicial não informa", ligado("raca_padrao"), "O PJe exige este campo para pessoa física.")))];
+}
+function cfgLogin() {
+  const senha = h("input", { type: "password", autocomplete: "new-password", value: pjeDigitado.senha,
+    placeholder: cfg.pje.tem_senha ? "guardada (deixe em branco para manter)" : "não preenchida", oninput: ev => { pjeDigitado.senha = ev.target.value; mudou(); } });
+  const totp = h("input", { type: "password", autocomplete: "off", value: pjeDigitado.totp_key,
+    placeholder: cfg.pje.tem_totp ? "guardada (deixe em branco para manter)" : "não preenchida", oninput: ev => { pjeDigitado.totp_key = ev.target.value; mudou(); } });
+  return [h("h1", {}, "Login do PJe"), h("p", { class: "intro" }, "O robô entra no PJe com CPF, senha e o código do autenticador, sem certificado digital. A senha não aparece aqui depois de salva."),
+    h("div", { class: "cartao" }, h("div", { class: "grade" },
+      campo("CPF", h("input", { inputmode: "numeric", value: pjeDigitado.cpf, oninput: ev => { pjeDigitado.cpf = ev.target.value; mudou(); } })),
+      campo("Senha do PJe", senha),
+      campo("Chave do autenticador", totp, "O código secreto do app autenticador (2 fatores), não os 6 números.")))];
+}
+function cfgDocumentos() {
+  const exemplo = h("span", { class: "dica" });
+  const atualizarExemplo = () => exemplo.textContent = `Ex.: "${cfg.prefixo_anexo || ""} 01] Documentos pessoais.pdf" é o 1º anexo. O PDF que não começa assim é a petição inicial.`;
+  atualizarExemplo();
+  const tipoAnexo = chave => escolha(chave, cfg[chave], tiposDocumento(), { aoMudar: ev => { cfg[chave] = ev.target.value; mudou(); } });
+  return [h("h1", {}, "Pastas e documentos"), h("p", { class: "intro" }, "Onde estão os clientes e como o escritório organiza os arquivos de cada um."),
+    h("div", { class: "cartao" }, h("h2", {}, "Pasta dos clientes"), h("p", {}, "Cada cliente é uma pasta aqui dentro. Os já cadastrados vão para a subpasta Concluído."),
+      ligado("pasta_clientes")),
+    h("div", { class: "cartao" }, h("h2", {}, "Anexos"), h("div", { class: "grade" },
+      h("div", { class: "inteira" }, campo("O nome dos anexos começa com", ligado("prefixo_anexo", { style: "max-width:200px" }, v => v, atualizarExemplo), null), exemplo),
+      campo("Tipo do 1º anexo no PJe", tipoAnexo("anexo_primeiro")),
+      campo("Tipo dos demais anexos", tipoAnexo("anexo_demais")))),
+    h("div", { class: "cartao" }, h("h2", {}, "Modelo do documento de cadastro (.docx)"),
+      h("p", {}, "O robô lê do .docx as linhas \"Rótulo: valor\" e as tabelas de duas colunas. Se o modelo do escritório chama um campo por outro nome, ensine aqui. Entre parênteses está o rótulo que ele já entende sozinho."),
+      tabelaDePares(rotulos, [["rotulo", "Rótulo no seu documento", { placeholder: "ex.: Nome do Autor" }],
+        ["campo", "Campo do robô", { opcoes: cfg.campos.map(([c, n]) => [c, `${n} (${c})`]) }]], "Adicionar rótulo"))];
+}
+function tabelaDePares(lista, colunas, textoNovo, classe = "") {
+  const corpo = h("tbody");
+  const desenhar = () => corpo.replaceChildren(...lista.map((par, i) => h("tr", {},
+    colunas.map(([chave, nome, { opcoes, opcoesPje, ...attrs } = {}]) => h("td", {},
+      opcoes ? h("select", { "aria-label": nome, onchange: ev => { par[chave] = ev.target.value; mudou(); } },
+        h("option", { value: "" }, "Escolha"), opcoes.map(([v, t]) => h("option", { value: v, selected: v === par[chave] }, t)))
+      : opcoesPje ? escolha(chave, par[chave], opcoesPje(), { aoMudar: ev => { par[chave] = ev.target.value; mudou(); } })
+      : h("input", { value: par[chave] || "", "aria-label": nome, ...attrs, oninput: ev => { par[chave] = ev.target.value; mudou(); } }))),
+    h("td", {}, h("button", { class: "botao fantasma", type: "button", onclick: () => { lista.splice(i, 1); mudou(); desenhar(); } }, "Remover")))));
+  desenhar();
+  return h("div", {}, h("table", { class: "tabela " + classe }, h("thead", {}, h("tr", {}, colunas.map(([, nome]) => h("th", {}, nome)), h("th"))), corpo),
+    h("button", { class: "botao", type: "button", style: "margin-top:10px", onclick: () => {
+      lista.push(Object.fromEntries(colunas.map(([c]) => [c, ""]))); mudou(); desenhar(); corpo.querySelector("tr:last-child input, tr:last-child select").focus();
+    } }, textoNovo));
+}
+function cfgPadrao() {
+  // mesmas listas encadeadas da ficha: matéria > jurisdição > competência > classe
+  const p = cfg.padrao;
+  const sel = {};
+  const refazer = () => {
+    if (sel.j.tagName === "SELECT") preencherEscolha(sel.j, p["jurisdição"], jurisdicoesDe(p["matéria"]), "Identificar pela inicial");
+    if (sel.c.tagName === "SELECT") preencherEscolha(sel.c, p["competência"], competenciasDe(p["matéria"], p["jurisdição"]), "Identificar pela inicial");
+    if (sel.k.tagName === "SELECT") preencherEscolha(sel.k, p["classe judicial"], classesDe(p["matéria"], p["competência"]), "Identificar pela inicial");
+  };
+  const lista = (chave, opcoes) => escolha(chave, p[chave], opcoes, { vazio: "Identificar pela inicial",
+    aoMudar: ev => { p[chave] = ev.target.value; mudou(); refazer(); } });
+  sel.m = lista("matéria", materias());
+  sel.j = lista("jurisdição", jurisdicoesDe(p["matéria"]));
+  sel.c = lista("competência", competenciasDe(p["matéria"], p["jurisdição"]));
+  sel.k = lista("classe judicial", classesDe(p["matéria"], p["competência"]));
+  return [h("h1", {}, "Padrão do escritório"),
+    h("p", { class: "intro" }, "O que o robô usa quando a petição inicial não diz. Deixe em \"Identificar pela inicial\" o que muda de um processo para outro. O que estiver na inicial ou no .docx do cliente vale mais que o padrão, e tudo pode ser trocado na ficha de cada cliente."),
+    h("div", { class: "cartao" }, h("div", { class: "grade" },
+      campo("Matéria", sel.m), campo("Jurisdição", sel.j), campo("Competência", sel.c), campo("Classe judicial", sel.k),
+      campo("Assunto principal", h("input", { value: p["assunto principal"] || "", placeholder: "Identificar pelo dicionário",
+        oninput: ev => { p["assunto principal"] = ev.target.value; mudou(); } }), "Código e nome, ex.: 10158 - FGTS")))];
+}
+function cfgDicionario() {
+  return [h("h1", {}, "Dicionário"),
+    h("p", { class: "intro" }, "A petição inicial não traz o código do assunto. Ensine aqui: quando todas as palavras de uma linha aparecem na inicial, o robô usa o assunto e a matéria dela. Vale a primeira linha que servir; maiúscula e acento não importam."),
+    h("div", { class: "cartao" }, tabelaDePares(dicionario, [
+      ["frases", "Palavras na inicial", { placeholder: "ex.: dano moral; banco" }],
+      ["assunto", "Assunto (código - nome)", { placeholder: "ex.: 10433 - Indenização por Dano Moral" }],
+      ["materia", "Matéria", { opcoesPje: () => materias() }]], "Adicionar linha", "dicionario"),
+      h("p", { class: "dica", style: "margin:10px 0 0" }, "Separe as palavras com ponto e vírgula. \"fgts\" sozinho já basta quando a palavra só aparece nesse tipo de ação."))];
+}
+function cfgPartes() {
+  return [h("h1", {}, "Réus conhecidos"),
+    h("p", { class: "intro" }, "Réus que a inicial cita sem o CNPJ que o PJe usa (por exemplo, o Estado de Mato Grosso). O robô procura a parte no PJe por este CNPJ."),
+    h("div", { class: "cartao" }, tabelaDePares(partes, [["nome", "Nome como aparece na inicial", { placeholder: "ESTADO DE MATO GROSSO" }],
+      ["cnpj", "CNPJ no PJe", { inputmode: "numeric", placeholder: "00.000.000/0000-00" }]], "Adicionar réu"))];
+}
+
+// Opções do PJe: o que foi lido e o botão de ler de novo
+const selPje = { m: null, j: null, c: null }, filtroPje = { m: "", j: "", c: "", k: "" };
+function cfgPje() {
+  const ms = materias(), nJ = jurisdicoesDe().length, nK = unir(ms.map(m => classesDe(m))).length;
+  const rascunho = h("input", { inputmode: "numeric", placeholder: "opcional", style: "max-width:160px" });
+  const doZero = h("input", { type: "checkbox" });
+  const colunas = h("div", { class: "cascata" });
+  const coluna = (titulo, chave, itens, clicavel, aoEscolher) => {
+    const ul = h("ul");
+    const desenharItens = () => ul.replaceChildren(...itens.filter(i => parecido(i).includes(parecido(filtroPje[chave]))).map(i =>
+      h("li", { class: clicavel ? "" : "texto" }, clicavel ? h("button", { type: "button", "aria-pressed": selPje[chave] === i, onclick: () => aoEscolher(i) }, i) : i)));
+    desenharItens();
+    return h("div", { class: "coluna" }, h("h3", {}, titulo),
+      h("input", { placeholder: "Filtrar", "aria-label": "Filtrar " + titulo, value: filtroPje[chave], oninput: ev => { filtroPje[chave] = ev.target.value; desenharItens(); } }), ul);
+  };
+  const desenharColunas = () => colunas.replaceChildren(
+    coluna("Matéria", "m", ms, true, v => { selPje.m = v; selPje.j = selPje.c = null; desenharColunas(); }),
+    coluna("Jurisdição", "j", selPje.m ? jurisdicoesDe(selPje.m) : [], true, v => { selPje.j = v; selPje.c = null; desenharColunas(); }),
+    coluna("Competência", "c", selPje.m && selPje.j ? competenciasDe(selPje.m, selPje.j) : [], true, v => { selPje.c = v; desenharColunas(); }),
+    coluna("Classe judicial", "k", selPje.m && selPje.c ? classesDe(selPje.m, selPje.c) : [], false));
+  desenharColunas();
+  const lista = (titulo, itens) => h("div", { class: "coluna" }, h("h3", {}, titulo, " ", h("span", { class: "dica" }, itens.length)),
+    h("ul", { style: "height:220px" }, itens.map(i => h("li", { class: "texto" }, i))));
+  return [h("h1", {}, "Opções do PJe"),
+    h("p", { class: "intro" }, ms.length ? `Lidas do PJe em ${mapa.atualizado_em}: ${ms.length} matérias, ${nJ} jurisdições e ${nK} classes. É daqui que saem as listas de escolha do programa.`
+      : "As opções do PJe ainda não foram lidas. Sem elas, os campos de matéria, jurisdição, competência e classe ficam como texto livre."),
+    h("div", { class: "cartao" }, h("h2", {}, "Ler de novo do PJe"),
+      h("p", {}, "Faça quando o tribunal mudar a tela de Novo processo. O robô entra no PJe e percorre as listas sem incluir nada; leva uns 45 minutos e dá para continuar de onde parou. Com o número de um rascunho criado depois de 23/10/2026, ele lê também os tipos de documento, as prioridades e os tipos de parte."),
+      h("div", { style: "display:flex;gap:16px;align-items:end;flex-wrap:wrap" },
+        campo("Número de um rascunho", rascunho),
+        h("label", { style: "display:flex;gap:8px;align-items:center;height:36px" }, doZero, "Ler tudo desde o começo"),
+        h("button", { class: "botao principal", type: "button", disabled: !!est.tarefa, onclick: async () => {
+          try { await api("/api/mapa/ler", { rascunho: rascunho.value, do_zero: doZero.checked }); mostrarTela("cadastro"); await atualizarEstado(); }
+          catch (e) { avisar(e.message); }
+        } }, "Ler do PJe"))),
+    colunas,
+    rasc().id ? h("div", { class: "cascata", style: "grid-template-columns:repeat(3,minmax(0,1fr));margin-top:10px" },
+      lista("Tipos de documento", tiposDocumento()), lista("Prioridades", rasc().prioridades || []),
+      lista("Tipos de parte (polo ativo)", Object.keys((rasc().tipos_parte || {}).ativo || {}))) : null];
+}
+
+// ---------- salvar a configuração ----------
+let pjeDigitado = { cpf: "", senha: "", totp_key: "" };
+function mudou() { haMudancas = true; $("#msg-salvar").textContent = "Há alterações não salvas."; $("#msg-salvar").style.color = ""; mostrarBarraSalvar(); }
+function mostrarBarraSalvar() { $("#salvar-barra").hidden = !(haMudancas && !$("#tela-config").hidden); }
+async function carregarEscritorio() {
+  cfg = await api("/api/escritorio");
+  cfg.padrao = { ...cfg.padrao };
+  // na tela viram linhas de texto; no arquivo, dicionários e listas
+  rotulos = Object.entries(cfg.rotulos_docx).map(([rotulo, campo]) => ({ rotulo, campo }));
+  partes = Object.entries(cfg.partes_conhecidas).map(([nome, cnpj]) => ({ nome, cnpj }));
+  dicionario = cfg.dicionario.map(t => ({ frases: t.frases.join("; "), assunto: t.assunto || "", materia: t.materia || "" }));
+  pjeDigitado = { cpf: cfg.pje.cpf, senha: "", totp_key: "" };
+  haMudancas = false;
+  aplicarIdentidade(); mostrarBarraSalvar();
+  if (!$("#tela-config").hidden) desenharConfig();
+}
+$("#descartar").addEventListener("click", carregarEscritorio);
+$("#salvar").addEventListener("click", async () => {
+  const { campos, pessoas, pje, ...resto } = cfg;
+  const corpo = { ...resto,
+    rotulos_docx: Object.fromEntries(rotulos.filter(r => r.rotulo.trim() && r.campo).map(r => [r.rotulo.trim().toLowerCase(), r.campo])),
+    partes_conhecidas: Object.fromEntries(partes.filter(p => p.nome.trim()).map(p => [p.nome.trim().toUpperCase(), p.cnpj])),
+    dicionario: dicionario.filter(t => t.frases.trim() || t.assunto.trim() || t.materia).map(t => ({
+      frases: t.frases.split(";").map(f => f.trim()).filter(Boolean), assunto: t.assunto.trim(), materia: t.materia })),
+    padrao: Object.fromEntries(Object.entries(cfg.padrao).filter(([, v]) => v)), pje: pjeDigitado };
+  try {
+    await api("/api/escritorio", corpo);
+    await carregarEscritorio();
+    $("#salvar-barra").hidden = false;
+    $("#msg-salvar").textContent = "Alterações salvas."; $("#msg-salvar").style.color = "var(--ok)";
+    setTimeout(mostrarBarraSalvar, 2500);
+    carregarClientes();
+  } catch (e) { $("#msg-salvar").textContent = e.message; $("#msg-salvar").style.color = "var(--erro)"; }
+});
+window.addEventListener("beforeunload", ev => { if (haMudancas) ev.preventDefault(); });
+
+async function carregarMapa() {
+  try { mapa = await api("/api/mapa"); } catch { mapa = {}; }
+  mapa.materias = mapa.materias || {};
+  const tipos = unir([TIPOS_PARTE_COMUNS, ...Object.values(rasc().tipos_parte || {}).map(Object.keys)]);
+  $("#dl-tipos-parte").replaceChildren(...tipos.map(t => h("option", { value: t })));
+  if (!$("#tela-config").hidden) desenharConfig();
+}
+function avisar(msg) {
+  registro.append(h("span", { class: "erro" }, "ERRO: " + msg + "\n"));
+  const t = $("#toast");
+  t.replaceChildren(icone("erro"), h("p", {}, msg), h("button", { class: "botao fantasma", type: "button", onclick: () => t.hidden = true }, "Fechar"));
+  t.hidden = false;
+  clearTimeout(avisar.tempo);
+  avisar.tempo = setTimeout(() => t.hidden = true, 10000);
+}
+
+(async () => {
+  await carregarEscritorio();
+  await carregarMapa();
+  await atualizarEstado();
+  await carregarClientes();
+  setInterval(atualizarEstado, 1000);
+})();
+</script>
+</body>
+</html>

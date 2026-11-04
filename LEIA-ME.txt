@@ -1,0 +1,43 @@
+ROBÔ DE CADASTRO NO PJe - o que é cada coisa
+
+PARA USAR
+  Abrir cadastro.bat        -> ABRA ESTE (dois cliques). Liga o programa e abre a tela no navegador
+                               (http://127.0.0.1:8765). Deixe a janela preta aberta enquanto usar.
+
+PASTAS
+  sistema\                  -> o programa. Vai igual para todo escritório.
+    app_web.py                 a tela no navegador (Cadastro e Configurações). Só aceita este computador.
+    web\index.html             a página da tela.
+    novo_processo.py           o robô: lê a inicial, confere os dados e cadastra no PJe (rascunho; NÃO assina
+                               e NÃO protocola).
+    mapear_pje.py              lê do PJe todas as opções da tela Novo processo (Configurações > Opções do PJe).
+    mapa_pje.json              essas opções, já lidas (matéria > jurisdição > competência > classe, tipos de
+                               documento, prioridades, tipos de parte). Vale para todo escritório do TJMT.
+    gerar_cadastro_docx.py     cria o "Cadastro de Ação Judicial - ....docx" nas pastas que não têm (modelo da JVO).
+
+  dados_do_escritorio\      -> SÓ DESTE ESCRITÓRIO. Não copiar para outro.
+    config.json                CPF, senha e chave do autenticador do PJe.
+    escritorio.json            o que foi salvo em Configurações: nome, cor, pasta dos clientes, anexos, modelo do
+                               .docx, réus conhecidos, padrão do escritório, dicionário.
+    Perfil_PJe\                o Chrome do robô. Não mexer.
+    erros\                     foto e página de quando o robô pausa. Pode apagar o que for antigo.
+
+  testes\                   -> testes sem PJe: python test_novo_processo.py  e  python test_app_web.py
+
+COMO O ROBÔ IDENTIFICA O PROCESSO (sistema\novo_processo.py, identificar)
+  Lê a inicial inteira: jurisdição e competência pelo endereçamento, classe pela ação, réu e CPF/CNPJ pela
+  qualificação, escolhendo sempre entre as opções reais do PJe (mapa_pje.json). Assunto e matéria vêm do
+  Dicionário do escritório. O que nada identificar vem do Padrão do escritório. O .docx vale mais que tudo isso,
+  e a correção feita na ficha vale mais que o .docx.
+
+PASTAS DE CLIENTES (na pasta escolhida em Configurações; padrão: a pasta que contém esta)
+  Inicial .pdf + "DOC 01] ...pdf", "DOC 02] ...pdf"... (+ .docx de cadastro, opcional)
+  correcoes.json            -> o que foi mudado na ficha do cliente (vale mais que o .docx e a inicial).
+  rascunho.json             -> o rascunho que o robô já criou no PJe: um novo cadastro continua dele.
+  Cliente cadastrado sem erro vai para "Concluído".
+
+PARA LEVAR A OUTRO ESCRITÓRIO
+  Copie esta pasta SEM dados_do_escritorio\ (ou baixe do GitHub: github.com/TheoCarvalhoDEV/cadastroporcessosPJE).
+  No computador novo: Python 3 e Google Chrome instalados, e uma vez no Prompt de Comando:
+      pip install flask playwright python-docx pyotp PyPDF2
+  Depois: Abrir cadastro.bat > Configurações (login do PJe, pasta, nome, cor) > Salvar alterações.

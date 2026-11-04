@@ -1,0 +1,31 @@
+O QUE ESTÁ MUDANDO AGORA (desde 04/11/2026): o robô troca o Selenium pelo Playwright
+
+Por quê: para levar o robô a outros escritórios. O Playwright usa o Google Chrome que já está instalado, espera
+sozinho a tela do PJe terminar de carregar (as listas com busca, os modais) e é mais simples de instalar.
+
+SITUAÇÃO (04/11/2026, 15h30): TROCA FEITA. Falta só ver um cadastro completo rodando com o Playwright.
+  Já conferido no PJe, só lendo (sem incluir, vincular nem salvar nada):
+    [x] abrir o Chrome e fazer o login
+    [x] Dados iniciais: matéria, jurisdição, competência e classe
+    [x] abrir um rascunho, ler partes, assunto e quantos documentos tem
+    [x] modal de parte: tipo da parte e o 2º passo (Física, Jurídica...)
+    [x] leitura das opções do PJe
+  Ainda não rodou de verdade com o Playwright (só convertido e testado sem PJe):
+    [ ] clicar em Incluir (criar o rascunho)
+    [ ] vincular parte (pessoa física, órgão público), cadastrar endereço, raça/cor
+    [ ] Características (justiça gratuita, liminar, valor, segredo, prioridade)
+    [ ] subir a inicial e os anexos
+  -> O primeiro cliente cadastrado agora vai testar essas etapas. Se pausar, mande a foto da tela.
+
+O QUE MUDOU (só a parte que mexe no navegador):
+  sistema\novo_processo.py       abrir o Chrome, o login e as 6 etapas no PJe.
+  sistema\mapear_pje.py          a leitura das opções do PJe.
+  sistema\app_web.py             o robô trabalha sempre na mesma "linha" do programa (o Playwright exige).
+  testes\test_novo_processo.py   os testes das etapas.
+  As versões com Selenium foram apagadas (estão na Lixeira do Windows deste computador).
+
+O QUE NÃO MUDOU:
+  a tela (sistema\web\index.html), a leitura da inicial, o dicionário, o padrão do escritório, as pastas dos
+  clientes, os dados do escritório (dados_do_escritorio\) e o rascunho guardado de cada cliente.
+
+Quando o primeiro cadastro completo passar, este arquivo sai.
