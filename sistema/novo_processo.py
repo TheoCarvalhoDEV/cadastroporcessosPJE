@@ -976,7 +976,7 @@ def parte(d, dados, polo):
     abrir_modal_parte(d, polo, dados[c_papel])
     escolher_pessoa(d, pessoa)
     if pessoa == "FÍSICA":
-        pessoa_fisica(d, nome, doc, grid, dados.get("endereço", "") if polo == "A" else "")
+        pessoa_fisica(d, nome, doc, grid, *((dados.get("endereço", ""), dados.get("raça", "")) if polo == "A" else ("", "")))
     elif pessoa == "ÓRGÃO PÚBLICO":  # Jurídica + órgão público, buscado pelo CNPJ
         clicar(d, "input[id$='isOrgaoPublico1SelectOneRadio:0']")    # Órgão público? Sim
         digitar(d, "input[id$=':preCadastroPessoaFisica_cnpjPessoaJuridica']", doc)
@@ -1000,8 +1000,9 @@ def parte(d, dados, polo):
                        "Inserir e depois em Continuar.")
 
 
-def pessoa_fisica(d, nome, cpf, grid, endereco=""):
-    """Pessoa física pelo CPF: confere o nome da Receita, endereço e Raça/Cor, e vincula."""
+def pessoa_fisica(d, nome, cpf, grid, endereco="", raca=""):
+    """Pessoa física pelo CPF: confere o nome da Receita, endereço e Raça/Cor (a da ficha; vazia, a padrão do
+    escritório), e vincula."""
     digitar(d, "input[id$=':preCadastroPessoaFisica_nrCPF']", cpf)
     clicar(d, "input[id$=':pesquisarDocumentoPrincipal']")
     nome_receita = valor(visivel(d, "input[id$=':dsNomeCivil']"))
@@ -1015,8 +1016,9 @@ def pessoa_fisica(d, nome, cpf, grid, endereco=""):
     aguardar(d)
     conferir_endereco(d, nome, endereco)
     clicar(d, "[id='formInserirParteProcesso:informacoesPessoaisRichTab_lbl']")
-    escolher(d, "select[id$=':raca']", RACA_PADRAO)
-    avisos.append(f"Raça/Cor de {nome} marcada como '{RACA_PADRAO}'; profissão não preenchida.")
+    escolher(d, "select[id$=':raca']", raca or RACA_PADRAO)
+    avisos.append(f"Raça/Cor de {nome} marcada como '{raca or RACA_PADRAO}'"
+                  f"{'' if raca else ' (padrão do escritório)'}; profissão não preenchida.")
     vincular(d, "input[id$=':btnInserirParteProcesso']", grid, formatar_documento(cpf))
 
 

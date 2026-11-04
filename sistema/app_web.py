@@ -25,7 +25,7 @@ CAMPOS = [  # (chave do robô, nome na tela) - mesma ordem do Corrigir dados da 
     ("matéria", "Matéria"), ("jurisdição", "Jurisdição"), ("competência", "Competência"),
     ("classe judicial", "Classe judicial"), ("assunto principal", "Assunto"),
     ("tipo ativo", "Polo ativo: tipo da parte"), ("pessoa ativo", "Polo ativo: tipo de pessoa"),
-    ("nome completo", "Polo ativo: nome"), ("cpf", "Polo ativo: CPF/CNPJ"), ("endereço", "Polo ativo: endereço"),
+    ("nome completo", "Polo ativo: nome"), ("cpf", "Polo ativo: CPF/CNPJ"), ("endereço", "Polo ativo: endereço"), ("raça", "Polo ativo: raça/cor"),
     ("tipo passivo", "Polo passivo: tipo da parte"), ("pessoa passivo", "Polo passivo: tipo de pessoa"),
     ("entidade", "Polo passivo: nome"), ("cnpj", "Polo passivo: CPF/CNPJ"),
     ("justiça gratuita", "Justiça gratuita"), ("pedido de liminar ou antecipação de tutela", "Liminar ou tutela"),
@@ -258,7 +258,11 @@ def clientes():
     # ponytail: confere todas a cada pedido (lê os PDFs); com centenas de pastas, guardar por data de modificação
     lista = []
     for pasta in robo.pastas_de_clientes(raiz()):
-        item = {"nome": os.path.basename(pasta), "situacao": "pronto", "problema": ""}
+        item = {"nome": os.path.basename(pasta), "situacao": "pronto", "problema": "", "anexos": None}
+        try:  # para a lista: "Ação de Cobrança · 3 anexos"
+            item["anexos"] = len(robo.arquivos_da_pasta(pasta)[2])
+        except SystemExit:
+            pass
         try:
             robo.preparar(pasta)
         except SystemExit as e:
@@ -299,7 +303,8 @@ def cliente(nome):
         problema = ""
     except SystemExit as e:
         dados, problema = None, str(e)
-    return jsonify(problema=problema, campos=campos, dados=dados, motivos=motivos, rascunho=robo.rascunho_salvo(pasta))
+    return jsonify(problema=problema, campos=campos, dados=dados, motivos=motivos, rascunho=robo.rascunho_salvo(pasta),
+                   docx=os.path.basename(robo.arquivos_da_pasta(pasta)[0] or ""))
 
 
 @app.post("/api/clientes/<path:nome>/corrigir")
