@@ -83,6 +83,27 @@ def test_porteiro():
     assert web.get("/saude").status_code == 200
 
 
+def test_criar_senha_pelo_link_do_email():
+    """O link do e-mail do Firebase aponta para /nova-senha do próprio robô (a página do Firebase vinha sem a chave)."""
+    web = porteiro.app.test_client()
+    pagina = web.get("/nova-senha?mode=resetPassword&oobCode=abc&apiKey=&lang=pt-BR")
+    assert pagina.status_code == 200 and b"<html" in pagina.data.lower()
+    chamadas = []
+
+    def firebase(acao, corpo, resposta=(200, {})):
+        chamadas.append((acao, corpo))
+        return resposta
+    with mock.patch.object(porteiro, "firebase", firebase):
+        assert web.post("/nova-senha", json={"codigo": "abc", "senha": "segredo1"}).status_code == 200
+        assert chamadas == [("resetPassword", {"oobCode": "abc", "newPassword": "segredo1"})]
+        assert web.post("/nova-senha", json={"codigo": "abc", "senha": ""}).status_code == 400
+        assert web.post("/nova-senha", json={"codigo": "", "senha": "segredo1"}).status_code == 400
+    for erro, trecho in (("EXPIRED_OOB_CODE", "venceu"), ("INVALID_OOB_CODE", "venceu"), ("WEAK_PASSWORD : x", "6")):
+        with mock.patch.object(porteiro, "firebase", lambda a, c: (400, {"error": {"message": erro}})):
+            r = web.post("/nova-senha", json={"codigo": "abc", "senha": "123"})
+            assert r.status_code == 400 and trecho in r.get_json()["erro"], (erro, r.get_json())
+
+
 if __name__ == "__main__":
     testes = [f for n, f in sorted(globals().items()) if n.startswith("test_")]
     for t in testes:

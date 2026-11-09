@@ -1468,6 +1468,30 @@ function desenharEntrar() {
     } }, "Esqueci a senha")));
   email.focus();
 }
+// link do e-mail "criar senha" (servidor): o porteiro troca a senha com o código do link
+function desenharNovaSenha() {
+  mostrarTela("entrar");
+  const codigo = new URLSearchParams(location.search).get("oobCode") || "";
+  const senha = h("input", { type: "password", autocomplete: "new-password", required: true, minlength: 6 });
+  const repetir = h("input", { type: "password", autocomplete: "new-password", required: true });
+  const msg = h("div", { class: "aviso erro", role: "alert", hidden: true });
+  const mostrar = (texto, ok) => { msg.className = "aviso " + (ok ? "ok" : "erro"); encher(msg, icone(ok ? "certo" : "erro"), h("p", { style: "margin:0" }, texto)); msg.hidden = false; };
+  const botao = h("button", { class: "botao principal grande", type: "submit" }, "Criar senha");
+  encher($("#tela-entrar"), h("form", { class: "cartao", onsubmit: async ev => {
+    ev.preventDefault();
+    if (senha.value !== repetir.value) return mostrar("As duas senhas não são iguais.");
+    botao.disabled = true;
+    try {
+      await api("/nova-senha", { codigo, senha: senha.value });
+      mostrar("Senha criada. Agora entre com o seu e-mail e a senha nova.", true);
+      botao.textContent = "Ir para a tela de entrar"; botao.disabled = false; botao.type = "button";
+      botao.onclick = () => location.href = "/";
+    } catch (e) { mostrar(e.message); botao.disabled = false; }
+  } },
+    h("h1", {}, "Criar sua senha"), h("p", { class: "dica", style: "margin:0" }, "Pelo menos 6 caracteres."),
+    campo("Senha nova", senha), campo("Repita a senha", repetir), msg, botao));
+  senha.focus();
+}
 $("#sair").addEventListener("click", async () => { try { await api("/sair", {}); } finally { location.reload(); } });
 // arrastar pastas: lê cada pasta solta (readEntries devolve em lotes; repete até vir vazio)
 async function arquivosDoArraste(itens) {
@@ -1700,6 +1724,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
 });
 
 (async () => {
+  if (location.pathname === "/nova-senha") return desenharNovaSenha();
   try { await carregarEscritorio(); }
   catch (e) {
     if (!$("#tela-entrar").hidden) return;  // servidor sem sessão: fica na tela de entrar

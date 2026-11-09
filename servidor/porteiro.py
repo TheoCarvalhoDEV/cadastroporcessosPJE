@@ -107,6 +107,7 @@ def grande_demais(e):
 
 
 @app.get("/")
+@app.get("/nova-senha")  # link do e-mail de criar senha (a página monta o formulário a partir do caminho)
 def pagina():
     r = send_file(os.path.join(WEB, "index.html"))
     r.headers["Cache-Control"] = "no-cache"
@@ -157,6 +158,26 @@ def esqueci():
     if email:
         pedir_nova_senha(email)
     return jsonify(ok=True)
+
+
+@app.post("/nova-senha")
+def nova_senha():
+    """Cria a senha com o código do link do e-mail (o e-mail aponta para cá: a página do próprio Firebase vinha
+    sem a chave de API e dava 'The selected page mode is invalid')."""
+    corpo = request.get_json(silent=True) or {}
+    codigo, senha = str(corpo.get("codigo", "")), str(corpo.get("senha", ""))
+    if not codigo or not senha:
+        return jsonify(erro="Escreva a senha nova."), 400
+    try:
+        status, resposta = firebase("resetPassword", {"oobCode": codigo, "newPassword": senha})
+    except Exception:
+        return jsonify(erro="Não consegui falar com o serviço de login. Tente de novo em instantes."), 502
+    if status == 200:
+        return jsonify(ok=True)
+    motivo = json.dumps(resposta)
+    if "WEAK_PASSWORD" in motivo:
+        return jsonify(erro="A senha precisa de pelo menos 6 caracteres."), 400
+    return jsonify(erro="O link venceu ou já foi usado. Na tela de entrar, clique em Esqueci a senha para receber outro."), 400
 
 
 @app.route("/api/<path:resto>", methods=["GET", "POST"])
