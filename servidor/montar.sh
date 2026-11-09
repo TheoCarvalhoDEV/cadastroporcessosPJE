@@ -27,8 +27,8 @@ if [ -d $CODIGO/.git ]; then git -C $CODIGO pull --ff-only; else git clone $REPO
 
 # Python 3.14 (mesma versão do desenvolvimento) com uv, e o Google Chrome que o robô usa
 command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
-[ -x $RAIZ/venv/bin/python ] || uv venv --python 3.14 $RAIZ/venv
-uv pip install --python $RAIZ/venv/bin/python -q -r $CODIGO/servidor/requisitos.txt
+[ -x $RAIZ/venv/bin/python ] || uv venv --no-config --python 3.14 $RAIZ/venv
+uv pip install --no-config --python $RAIZ/venv/bin/python -q -r $CODIGO/servidor/requisitos.txt
 $RAIZ/venv/bin/playwright install --with-deps chrome
 
 # Caddy: HTTPS automático na frente do porteiro

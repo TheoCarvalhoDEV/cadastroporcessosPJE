@@ -3,8 +3,9 @@
 #   sudo bash /srv/robo/codigo/servidor/atualizar.sh
 set -euo pipefail
 RAIZ=/srv/robo
+cd "$RAIZ"  # sudo mantém a pasta de quem rodou; o usuário robo não lê a pasta pessoal de ninguém
 sudo -u robo git -C $RAIZ/codigo pull --ff-only
-sudo -u robo env UV_PYTHON_INSTALL_DIR=/opt/uv-python uv pip install --python $RAIZ/venv/bin/python -q \
+sudo -u robo env UV_PYTHON_INSTALL_DIR=/opt/uv-python uv pip install --no-config --python $RAIZ/venv/bin/python -q \
   -r $RAIZ/codigo/servidor/requisitos.txt
 cp $RAIZ/codigo/servidor/robo@.service $RAIZ/codigo/servidor/porteiro.service $RAIZ/codigo/servidor/limpar.service \
    $RAIZ/codigo/servidor/limpar.timer /etc/systemd/system/

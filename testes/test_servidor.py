@@ -58,6 +58,15 @@ def test_montar_nao_derruba_cadastro():
     assert "override_rc" in montar  # needrestart não reinicia robo@ sozinho depois de atualização do Ubuntu
 
 
+def test_uv_nao_le_configuracao_de_quem_rodou():
+    """sudo mantém a pasta de quem rodou: o uv do usuário robo procurava uv.toml ali e parava (visto no servidor)."""
+    pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "servidor")
+    for nome in ("montar.sh", "atualizar.sh"):
+        with open(os.path.join(pasta, nome), encoding="utf-8") as f:
+            linhas = [l for l in f.read().replace("\\\n", " ").splitlines() if "uv pip install" in l or "uv venv" in l]
+        assert linhas and all("--no-config" in l for l in linhas), (nome, linhas)
+
+
 if __name__ == "__main__":
     testes = [f for n, f in sorted(globals().items()) if n.startswith("test_")]
     for t in testes:
