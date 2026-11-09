@@ -1,0 +1,7 @@
+flask
+playwright==1.58.0
+python-docx
+pyotp
+PyPDF2
+google-cloud-secret-manager
+waitress

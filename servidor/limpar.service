@@ -1,0 +1,9 @@
+# Apaga o que passou de 30 dias em Concluído, Lixeira e fotos das pausas (chamado por limpar.timer)
+[Unit]
+Description=Limpeza de 30 dias do robô de cadastro no PJe
+
+[Service]
+Type=oneshot
+User=robo
+Environment=ROBO_RAIZ=/srv/robo
+ExecStart=/srv/robo/venv/bin/python /srv/robo/codigo/servidor/limpar.py

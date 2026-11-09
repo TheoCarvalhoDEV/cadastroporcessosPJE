@@ -1,0 +1,18 @@
+# Um robô (app_web.py) por escritório: systemctl enable --now robo@<id>
+[Unit]
+Description=Robô de cadastro no PJe - escritório %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=robo
+EnvironmentFile=/srv/robo/robo.env
+EnvironmentFile=/srv/robo/escritorios/%i/robo.env
+Environment=ROBO_DADOS=/srv/robo/escritorios/%i
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/srv/robo/venv/bin/python /srv/robo/codigo/sistema/app_web.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

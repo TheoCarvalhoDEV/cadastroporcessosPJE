@@ -1,4 +1,5 @@
 """Testes sem PJe. Rodar: python test_novo_processo.py"""
+import json
 import os
 import tempfile
 import sys
@@ -7,6 +8,8 @@ from unittest import mock
 import docx
 from playwright.sync_api import TimeoutError as TimeoutException
 import novo_processo as robo
+
+robo.ARQUIVO_HISTORICO = os.path.join(tempfile.mkdtemp(), "historico.jsonl")  # o relatório de verdade não recebe testes
 
 # os testes não dependem da configuração deste computador (escritorio.json): valem o dicionário e o padrão da JVO
 robo.DICIONARIO = [
@@ -516,6 +519,137 @@ def test_pular_cliente():
     assert isinstance(resultado, SystemExit) and "CPF de outra pessoa" in str(resultado)
 
 
+class PJeFalso:
+    """Login do PJe (Keycloak) de mentira: tela de login -> código, ou página do QR (dispositivo novo pedido) -> painel."""
+    SEGREDO = "abcdefghij0123456789"  # o campo escondido totpSecret: a chave é o base32 disso
+
+    def __init__(self, depois_da_senha):
+        self.tela, self.depois_da_senha, self.url, self.clicados, self.preenchido = "painel", depois_da_senha, "", [], {}
+
+    def elementos(self):
+        return {"login": ["#username", "#password", "#kc-login"],
+                "codigo": ["#otp", "#kc-login", "a:Configurar novo dispositivo"],
+                "pedido": [],
+                "qr": ["#kc-totp-settings-form", "#totp", "#saveTOTPBtn", "input[name='totpSecret']", "img[alt*='Barcode']"],
+                "painel": ["a[href*='logout.seam']"]}[self.tela]
+
+    def query_selector_all(self, seletor):
+        pedidos = [s.strip() for s in seletor.split(",")]
+        return [ElementoDoLogin(self, n) for n in self.elementos()
+                if n in pedidos or (n.startswith("a:") and "a" in pedidos) or (n == "img[alt*='Barcode']" and n in seletor)]
+
+    def query_selector(self, seletor):
+        return next(iter(self.query_selector_all(seletor)), None)
+
+    def goto(self, url):
+        self.url = url
+        if "logout" in url:
+            self.tela = "login"
+        elif url == robo.URL_LOGIN:
+            self.tela = "painel" if self.tela == "painel" else "login"
+        elif "action-token" in url:
+            self.tela = "qr"
+
+    def clicar(self, nome):
+        self.clicados.append(nome)
+        if nome == "#kc-login" and self.tela == "login":
+            self.tela = self.depois_da_senha
+        elif nome.startswith("a:"):
+            self.tela = "pedido"  # o PJe manda o e-mail
+        elif nome == "#saveTOTPBtn":
+            chave = robo.base64.b32encode(self.SEGREDO.encode()).decode()
+            assert self.preenchido["#totp"] == robo.pyotp.TOTP(chave).now()
+            self.tela = "painel"
+
+    def wait_for_timeout(self, ms):
+        pass
+
+    def evaluate(self, js, *args):
+        return True
+
+
+class ElementoDoLogin:
+    def __init__(self, pagina, nome):
+        self.pagina, self.nome = pagina, nome
+
+    def is_visible(self):
+        return True
+
+    def fill(self, valor):
+        self.pagina.preenchido[self.nome] = valor
+
+    def click(self, **k):
+        self.pagina.clicar(self.nome)
+
+    def inner_text(self):
+        return self.nome[2:] if self.nome.startswith("a:") else ""
+
+    def get_attribute(self, atributo):
+        return {"value": PJeFalso.SEGREDO, "src": "data:image/png;base64,QR", "href": "/pje/logout.seam"}.get(atributo)
+
+
+def configurar(pagina, link="https://sso.cloud.pje.jus.br/auth/realms/pje/login-actions/action-token?key=x"):
+    """configurar_codigo() na página falsa. Devolve (resultado, guardado antes de concluir, links pedidos)."""
+    guardado, pedidos = [], []
+
+    def guardar(chave, qr):
+        guardado.append((chave, qr, list(pagina.clicados)))
+
+    def pedir_link(pediu):
+        pedidos.append(pediu)
+        return link
+    with mock.patch.multiple(robo, ler_config=lambda: {"cpf": "111.444.777-35", "senha": "x"}, saida=lambda linha: None):
+        return robo.configurar_codigo(pagina, pedir_link, guardar), guardado, pedidos
+
+
+def test_chave_do_texto():
+    assert robo.chave_do_texto(["Abra o aplicativo", "MFRG GZDF MZTW Q2LK GAYT EMZU GQ2T MNZY"]) == "MFRGGZDFMZTWQ2LKGAYTEMZUGQ2TMNZY"
+    assert robo.chave_do_texto(["ABCD EFGH", "texto qualquer"]) is None
+
+
+def test_configurar_codigo_direto_na_pagina_do_qr():
+    """Pediram dispositivo novo: o PJe já mostra o QR depois da senha. Guarda a chave ANTES de concluir."""
+    pagina = PJeFalso("qr")
+    (chave, qr), guardado, pedidos = configurar(pagina)
+    assert chave == robo.base64.b32encode(PJeFalso.SEGREDO.encode()).decode() and qr == "data:image/png;base64,QR"
+    assert guardado == [(chave, qr, ["#kc-login"])] and not pedidos  # guardou antes do CADASTRAR; sem e-mail
+    assert pagina.clicados[-1] == "#saveTOTPBtn" and pagina.tela == "painel"
+
+
+def test_configurar_codigo_pede_dispositivo_novo_e_espera_o_link():
+    pagina = PJeFalso("codigo")
+    (chave, _), guardado, pedidos = configurar(pagina)
+    assert pedidos == [True] and "a:Configurar novo dispositivo" in pagina.clicados and pagina.tela == "painel"
+    assert guardado[0][0] == chave
+
+
+def test_login_nao_conclui_dispositivo_novo_sozinho():
+    """No meio do cadastro o robô NÃO cadastra autenticador (trocaria o código do celular do advogado): para e explica."""
+    pagina = PJeFalso("qr")
+    pagina.tela = "login"
+    with mock.patch.multiple(robo, ler_config=lambda: {"cpf": "111.444.777-35", "senha": "x", "totp_key": "ABC"},
+                             saida=lambda linha: None):
+        try:
+            robo.entrar(pagina)
+            assert False, "devia parar"
+        except SystemExit as e:
+            assert "Configurar o código pelo robô" in str(e)
+    assert "#saveTOTPBtn" not in pagina.clicados
+
+
+def test_historico_do_relatorio():
+    """O que vai para a tela Relatório: o engasgo que o robô resolveu sozinho e a pausa com a resposta."""
+    open(robo.ARQUIVO_HISTORICO, "w").close()
+    rodar(seis(e2=etapa(TimeoutException("lento"))))
+    resultado, _, _ = rodar(seis(e4=etapa(robo.Problema("CPF de outra pessoa"))), respostas=["pular"])
+    assert isinstance(resultado, robo.Pulado)
+    with open(robo.ARQUIVO_HISTORICO, encoding="utf-8") as f:
+        ev = [json.loads(linha) for linha in f]
+    assert [(e["tipo"], e["etapa"], e["cliente"]) for e in ev] == [("sozinho", "E2", "Fulana"), ("pausa", "E4", "Fulana")]
+    assert ev[0]["vezes"] == 1 and "lento" in ev[0]["problema"]
+    assert ev[1]["resposta"] == "pular" and ev[1]["problema"] == "CPF de outra pessoa"
+
+
 def test_etapa1_cai_depois_de_criar_o_rascunho_nao_cria_outro():
     chamadas = []
     pend, recuperou, perguntas = rodar(seis(e1=etapa(cria_e_cai, chamadas=chamadas)))
@@ -595,6 +729,91 @@ def test_documentos_parciais_pausa():
             assert isinstance(e, robo.Problema) and "Faltam 11: DOC 05].pdf;" in str(e) and "DOC 04]" not in str(e)
     with mock.patch.multiple(robo, documentos_no_rascunho=lambda d: 16, saida=lambda linha: None):
         robo.documentos(None, "inicial.pdf", ["a.pdf"] * 15, refazendo=True)  # tudo lá: não faz nada
+
+
+# ---------- modo servidor ----------
+
+from types import SimpleNamespace
+from google.api_core.exceptions import NotFound
+
+
+class SegredosFalsos:
+    """Imita o SecretManagerServiceClient: versões [nome, dados, estado]."""
+    def __init__(self):
+        self.versoes = []
+
+    def access_secret_version(self, request):
+        ativas = [v for v in self.versoes if v[2] == "ENABLED"]
+        if not ativas:
+            raise NotFound("sem versão")
+        return SimpleNamespace(payload=SimpleNamespace(data=ativas[-1][1]))
+
+    def add_secret_version(self, request):
+        nome = f"{request['parent']}/versions/{len(self.versoes) + 1}"
+        self.versoes.append([nome, request["payload"]["data"], "ENABLED"])
+        return SimpleNamespace(name=nome)
+
+    def list_secret_versions(self, request):
+        return [SimpleNamespace(name=v[0]) for v in self.versoes if v[2] == "ENABLED"]
+
+    def destroy_secret_version(self, request):
+        for v in self.versoes:
+            if v[0] == request["name"]:
+                v[2] = "DESTROYED"
+
+
+def test_config_local():
+    tmp = tempfile.mkdtemp()
+    with mock.patch.object(robo, "SERVIDOR", False), mock.patch.object(robo, "ARQUIVO_CONFIG", os.path.join(tmp, "config.json")):
+        assert robo.ler_config() == {}
+        robo.gravar_config({"cpf": "11144477735"})
+        assert robo.ler_config() == {"cpf": "11144477735"}
+        assert os.listdir(tmp) == ["config.json"]  # gravação atômica não deixa .tmp
+
+
+def test_config_no_servidor():
+    falso = SegredosFalsos()
+    with mock.patch.object(robo, "SERVIDOR", True), mock.patch.object(robo, "cliente_segredos", lambda: falso), \
+         mock.patch.object(robo, "SEGREDO", "projects/p/secrets/pje-login-x"):
+        assert robo.ler_config() == {}  # escritório novo: ainda sem login
+        robo.gravar_config({"cpf": "1", "senha": "a"})
+        robo.gravar_config({"cpf": "1", "senha": "b"})
+        assert robo.ler_config() == {"cpf": "1", "senha": "b"}
+        assert [v[2] for v in falso.versoes] == ["DESTROYED", "ENABLED"]  # a senha velha não fica guardada
+        assert falso.versoes[1][0] == "projects/p/secrets/pje-login-x/versions/2"
+
+
+def test_fechar_navegador():
+    fechou = []
+    pagina = SimpleNamespace(context=SimpleNamespace(close=lambda: fechou.append(1)))
+    with mock.patch.object(robo, "navegador_atual", pagina):
+        robo.fechar_navegador()
+        assert robo.navegador_atual is None and fechou == [1]
+        robo.fechar_navegador()  # já fechado: não dá erro
+
+
+def test_chrome_do_servidor_sem_janela():
+    chamado = {}
+    contexto = SimpleNamespace(set_default_timeout=lambda t: None, pages=[SimpleNamespace(on=lambda *a: None)])
+
+    def abrir(perfil, **kw):
+        chamado.update(kw)
+        return contexto
+    pw = SimpleNamespace(chromium=SimpleNamespace(launch_persistent_context=abrir))
+    with mock.patch.object(robo, "SERVIDOR", True), mock.patch.object(robo, "_playwright", pw):
+        robo.abrir_navegador()
+    assert chamado["headless"] is True and chamado["viewport"] == {"width": 1366, "height": 768}
+    assert "no_viewport" not in chamado and "--start-maximized" not in chamado["args"]
+    # sem isso o PJe responde em inglês e o robô não reconhece "Código inválido" (tentaria de novo e bloquearia a conta)
+    assert chamado["locale"] == "pt-BR" and chamado["timezone_id"] == "America/Cuiaba"
+
+
+def test_lixeira_e_concluido_fora_da_lista():
+    raiz = tempfile.mkdtemp()
+    for p in ("Fulana", "Lixeira", "Concluído"):
+        os.makedirs(os.path.join(raiz, p))
+        open(os.path.join(raiz, p, "Fulana [Ação].pdf"), "wb").close()
+    assert [os.path.basename(p) for p in robo.pastas_de_clientes(raiz)] == ["Fulana"]
 
 
 if __name__ == "__main__":

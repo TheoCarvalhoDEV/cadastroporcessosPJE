@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cadastro no PJe</title>
 <link rel="icon" href="data:,">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preload" href="/fontes/plus-jakarta-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <script>
   // tema: o que o usuário escolheu; se nunca escolheu, o do sistema
   (function () { var t = null; try { t = localStorage.getItem("tema"); } catch (e) {}
@@ -14,13 +13,22 @@
     document.documentElement.dataset.tema = t; })();
 </script>
 <style>
+  /* fontes guardadas no programa (sistema/web/fontes): abrem sem internet e sem esperar o Google */
+  @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 200 800; font-display: swap;
+    src: url(/fontes/plus-jakarta-sans-latin-wght-normal.woff2) format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 200 800; font-display: swap;
+    src: url(/fontes/plus-jakarta-sans-latin-ext-wght-normal.woff2) format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap;
+    src: url(/fontes/jetbrains-mono-latin-500-normal.woff2) format("woff2"); }
   :root {
     color-scheme: light;
     --cor: #2F55E8; --sobre-cor: #fff;  /* cor do escritório (Configurações > Escritório) */
     --cor-texto: var(--cor);
     --cor-suave: color-mix(in srgb, var(--cor) 9%, var(--superficie));
     --cor-media: color-mix(in srgb, var(--cor) 26%, var(--superficie));
-    --fundo: #F5F6FA; --superficie: #fff; --borda: #E4E7EF; --borda-forte: #CDD3E0;
+    --fundo: #F3F5FA; --rail: #0F1530; --superficie: #fff; --borda: #E4E7EF; --borda-forte: #CDD3E0;
     --tinta: #141A2E; --tinta-2: #3F485C; --tinta-3: #5C657A;
     --hover: #F3F5FA;
     --ok: #1B6E49; --ok-fundo: #E3F4EB; --ok-borda: #BFE3CF;
@@ -36,7 +44,7 @@
   html[data-tema="escuro"] {
     color-scheme: dark;
     --cor-texto: color-mix(in srgb, var(--cor) 55%, #fff);
-    --fundo: #0E1220; --superficie: #171C2E; --borda: #262D45; --borda-forte: #3A4464;
+    --fundo: #0E1220; --rail: #080B16; --superficie: #171C2E; --borda: #262D45; --borda-forte: #3A4464;
     --tinta: #E8EBF4; --tinta-2: #B9C0D3; --tinta-3: #9AA3BB;
     --hover: #1F2540;
     --ok: #62D6A0; --ok-fundo: #11301F; --ok-borda: #1F5C3C;
@@ -70,7 +78,7 @@
   .botao:disabled { opacity: .45; cursor: default; }
   .link { background: none; border: 0; padding: 0; color: var(--cor-texto); font-size: 12px; font-weight: 600; cursor: pointer; }
   .link:hover { text-decoration: underline; }
-  input[type=text], input[type=password], input[type=number], input[type=search], input:not([type]), select {
+  input[type=text], input[type=email], input[type=password], input[type=number], input[type=search], input:not([type]), select {
     height: 44px; width: 100%; padding: 0 14px; border: 1px solid var(--borda); border-radius: 12px; background: var(--superficie);
     color: var(--tinta); font-size: 14px; font-weight: 500; }
   input::placeholder { color: var(--tinta-3); opacity: .85; }
@@ -137,6 +145,15 @@
   .lista-topo h2 { font: 800 18px var(--titulo); }
   .contagem { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--cor-suave); color: var(--cor-texto); }
   .lista-topo .botao { margin-left: auto; }
+  .lista-topo .botao:not([hidden]) ~ .botao { margin-left: 0; }
+  .lista.soltando { outline: 2px dashed var(--cor); outline-offset: -6px; }
+  /* servidor: tela de entrar (sem o menu e o topo) */
+  body.entrando { padding-left: 0; }
+  body.entrando .rail, body.entrando .topo { display: none; }
+  .entrar { min-height: 90vh; display: grid; place-items: center; padding: 16px; }
+  .entrar .cartao { width: min(400px, 100%); padding: 32px; display: flex; flex-direction: column; gap: 16px; }
+  .entrar h1 { margin: 0; font: 800 22px var(--titulo); }
+  .entrar .link { background: none; border: 0; padding: 0; color: var(--cor); font-weight: 600; cursor: pointer; text-align: left; }
   .busca { position: relative; margin: 0 20px 16px; }
   .busca > span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--tinta-3); pointer-events: none; }
   .busca input { padding-left: 42px; background: var(--fundo); }
@@ -228,6 +245,7 @@
   .pausa-cartao { padding: 24px; background: var(--alerta-fundo); border-color: var(--alerta-borda); }
   .pausa-cartao h2 { display: flex; align-items: center; gap: 8px; color: var(--alerta); font: 800 18px var(--titulo); }
   .pausa-cartao .sub { color: var(--alerta); margin-top: 4px; font-size: 13px; }
+  .pausa-cartao a { color: var(--cor); font-weight: 700; }
   .pausa-cartao .problema { margin: 12px 0 16px; font-size: 15px; max-width: 80ch; }
   .pausa-cartao .botoes { display: flex; gap: 8px; flex-wrap: wrap; }
   .pausa-cartao img { display: block; max-width: 100%; max-height: 260px; margin-top: 16px; border: 1px solid var(--alerta-borda);
@@ -250,11 +268,6 @@
   .voltar { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: none; border: 0; padding: 6px 4px;
     font-weight: 600; color: var(--tinta-2); cursor: pointer; }
   .voltar:hover { color: var(--tinta); }
-  #config-nav { padding: 8px; display: flex; flex-direction: column; gap: 2px; }
-  #config-nav button { text-align: left; height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: none; font-weight: 500;
-    color: var(--tinta-2); cursor: pointer; }
-  #config-nav button:hover { background: var(--hover); }
-  #config-nav button[aria-current="true"] { background: var(--cor-suave); color: var(--cor-texto); font-weight: 600; }
   .config-corpo { min-width: 0; }
   .config-corpo > h1 { font: 800 28px var(--titulo); letter-spacing: -.01em; margin: 4px 0 20px; }
   #config-conteudo { display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
@@ -271,6 +284,15 @@
   .cor[aria-checked="true"] { border-color: var(--c); }
   .cor.outra { position: relative; background: conic-gradient(#E4572E, #F3A712, #29BF12, #00A5CF, #7B2CBF, #E4572E); background-clip: content-box; }
   .cor.outra input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+  .autenticador { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border: 1px solid var(--borda); border-radius: 14px; background: var(--fundo); }
+  .autenticador strong { font-weight: 700; }
+  .autenticador .linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .autenticador .linha input { flex: 1; min-width: 260px; }
+  .autenticador .qr-bloco { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  .autenticador .qr-bloco > div { flex: 1; min-width: 240px; }
+  .autenticador img.qr { width: 196px; height: 196px; padding: 10px; background: #fff; border-radius: 12px; border: 1px solid var(--borda); image-rendering: pixelated; }
+  .autenticador .trabalhando { display: flex; align-items: center; gap: 10px; color: var(--cor-texto); font-weight: 600; }
+  .autenticador .trabalhando .ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--cor); animation: pulsa 1.4s ease-in-out infinite; }
   .ler { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; padding: 16px; border: 1px solid var(--borda); border-radius: 14px; background: var(--fundo); }
   .tabela { width: 100%; border-collapse: collapse; }
   .tabela th { text-align: left; font-size: 12px; color: var(--tinta-3); font-weight: 600; padding: 0 8px 6px 0; }
@@ -289,36 +311,185 @@
   .coluna li button[aria-pressed="true"] { background: var(--cor-suave); color: var(--cor-texto); font-weight: 600; }
   .coluna li.texto { padding: 5px 12px; line-height: 1.35; }
 
+  /* ---------- relatório ---------- */
+  .relatorio { --s-voce: var(--cor-forte, var(--cor)); --s-sozinho: #A3ABBE;  /* cinza de propósito: o destaque é o que precisou de vocês */
+    padding: 24px clamp(16px, 3vw, 32px) 48px; display: flex; flex-direction: column; gap: 16px; }
+  html[data-tema="escuro"] .relatorio { --s-sozinho: #5A6482; }
+  .rel-topo { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; }
+  .rel-topo h1 { font: 800 28px var(--titulo); letter-spacing: -.01em; }
+  .periodos { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+  .periodos button { height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--borda); background: var(--superficie);
+    font-size: 13px; font-weight: 600; color: var(--tinta-2); cursor: pointer; }
+  .periodos button:hover { background: var(--hover); }
+  .periodos button[aria-pressed="true"] { background: var(--cor-suave); border-color: var(--cor-media); color: var(--cor-texto); }
+  #relatorio-conteudo { display: flex; flex-direction: column; gap: 16px; transition: opacity .2s; }
+  #relatorio-conteudo.carregando { opacity: .5; }
+  .numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .numero { padding: 20px 24px; }
+  .numero .rot { font-size: 13px; font-weight: 600; color: var(--tinta-3); }
+  .numero .val { font: 800 34px/1.15 var(--titulo); margin-top: 6px; }
+  .numero .sub { font-size: 12px; color: var(--tinta-3); margin-top: 4px; }
+  .rel-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .rel-grade.larga { grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); }
+  .rel-bloco { padding: 24px; min-width: 0; }
+  .rel-bloco h2 { font: 800 18px var(--titulo); }
+  .rel-bloco .intro { font-size: 13px; color: var(--tinta-3); margin: 2px 0 18px; }
+  .legenda { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; font-weight: 600; color: var(--tinta-2); margin: -6px 0 14px; }
+  .legenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .legenda i { width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+  .barras { display: flex; flex-direction: column; gap: 6px; }
+  .barra-linha { display: grid; grid-template-columns: minmax(96px, 150px) minmax(0, 1fr) auto; gap: 12px; align-items: center; font-size: 13px; }
+  .barra-linha .rotulo { color: var(--tinta-2); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barra-linha .trilho { display: flex; gap: 2px; align-items: center; height: 26px; min-width: 0; }
+  .barra-linha .seg { position: relative; height: 14px; min-width: 4px; background: var(--c); }
+  .barra-linha .seg:last-child { border-radius: 0 4px 4px 0; }
+  .barra-linha .seg::after { content: ""; position: absolute; inset: -6px 0; }  /* área de passar o mouse maior que a barra */
+  .barra-linha .seg:hover { filter: brightness(1.12); }
+  .barra-linha .seg:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+  .barra-linha .valor { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .barra-linha .valor small { color: var(--tinta-3); font-size: 12px; font-weight: 600; }
+  .problemas { display: flex; flex-direction: column; }
+  details.problema { border-top: 1px solid var(--borda); }
+  details.problema:first-child { border-top: 0; }
+  details.problema summary { display: flex; align-items: center; gap: 12px; padding: 12px 4px; cursor: pointer; list-style: none; }
+  details.problema summary::-webkit-details-marker { display: none; }
+  details.problema summary:hover { background: var(--hover); border-radius: 10px; }
+  details.problema .textos { flex: 1; min-width: 0; }
+  details.problema .sub { font-size: 12px; color: var(--tinta-3); margin-top: 2px; }
+  details.problema .vezes { font: 800 18px var(--titulo); font-variant-numeric: tabular-nums; }
+  details.problema .seta { color: var(--tinta-3); transform: rotate(180deg); transition: transform .15s; }
+  details.problema[open] .seta { transform: rotate(270deg); }
+  details.problema .detalhe { padding: 0 4px 16px; display: flex; flex-direction: column; gap: 8px; }
+  details.problema .detalhe p { font-size: 13px; overflow-wrap: anywhere; }
+  details.problema img { max-width: 100%; max-height: 320px; border: 1px solid var(--borda); border-radius: 12px; align-self: flex-start; cursor: zoom-in; }
+  .rel-tabela th:first-child { width: auto; }
+  .rel-tabela th { padding: 0 8px 8px 0; }
+  .rel-tabela td { padding: 10px 8px 10px 0; border-top: 1px solid var(--borda); font-size: 13px; }
+  .rel-tabela td:last-child { width: auto; }
+  .rel-tabela td.num { color: var(--tinta-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pilula.neutra { background: var(--fundo); color: var(--tinta-2); }
+  .dica-grafico { position: fixed; z-index: 10; display: flex; align-items: center; gap: 8px; padding: 7px 11px; border-radius: 10px;
+    background: var(--barra); color: #fff; font-size: 12px; pointer-events: none; box-shadow: 0 6px 18px var(--sombra); white-space: nowrap; }
+  .dica-grafico i { width: 12px; height: 2px; border-radius: 1px; }
+  .dica-grafico span { color: #C9D0E2; }
+
   #toast { position: fixed; right: 20px; bottom: 20px; max-width: 460px; z-index: 9; align-items: center; box-shadow: 0 8px 24px var(--sombra); }
   #toast p { flex: 1; margin: 0; }
+
+
+  /* ---------- menu lateral (novo design) ---------- */
+  body { padding-left: 88px; }
+  .rail { position: fixed; z-index: 6; left: 0; top: 0; bottom: 0; width: 88px; background: var(--rail);
+    display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 0; }
+  .rail .sigla { width: 44px; height: 44px; border-radius: 13px; font-size: 15px; margin-bottom: 18px; }
+  .nav-item { width: 68px; padding: 10px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    border: 0; border-radius: 14px; background: none; color: #B9C0D8; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .nav-item:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .nav-item[aria-current="true"] { background: rgba(255,255,255,.13); color: #fff; }
+  .nav-item:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .rail-espaco { flex: 1; }
+  .topo .marca strong { font-size: 16px; }
+
+  /* ---------- ajustes: abas + resumo ao lado ---------- */
+  .config { grid-template-columns: minmax(0, 1fr) 320px; max-width: 1600px; padding-top: 0; }
+  .config-topo { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding-top: 24px; }
+  .config-topo h1 { font: 800 26px var(--titulo); letter-spacing: -.01em; }
+  .abas { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--borda); }
+  .aba { display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 16px; border: 0; border-bottom: 3px solid transparent;
+    margin-bottom: -1px; background: none; font-weight: 600; color: var(--tinta-2); cursor: pointer; }
+  .aba:hover { color: var(--tinta); background: var(--hover); }
+  .aba[aria-current="true"] { color: var(--cor-texto); border-bottom-color: var(--cor); }
+  .aba .ponto-aba { width: 8px; height: 8px; border-radius: 50%; background: #2E9A68; }
+  .aba .ponto-aba.alerta { background: var(--alerta-forte); }
+  .aba .conta { font-size: 11px; font-weight: 800; padding: 0 7px; border-radius: 999px; background: var(--fundo); color: var(--tinta-2); }
+  #config-conteudo { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+  #config-conteudo[data-aba="acesso"] { grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr)); }
+  #config-conteudo[data-aba="regras"] { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
+  #config-conteudo[data-aba="regras"] :is(#cfg-ordem, #cfg-dicionario) { grid-column: 1 / -1; }
+  .secao-cfg { padding: 24px; }
+  .config-resumo { position: sticky; top: 94px; display: flex; flex-direction: column; gap: 16px; }
+  .resumo { padding: 20px 22px 8px; }
+  .resumo h2 { font: 800 15px var(--titulo); margin-bottom: 4px; }
+  .resumo button { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; padding: 12px 6px; margin: 0 -6px;
+    width: calc(100% + 12px); border: 0; border-top: 1px solid var(--borda); background: none; border-radius: 0; cursor: pointer; }
+  .resumo button:first-of-type { border-top: 0; }
+  .resumo button:hover { background: var(--hover); }
+  .resumo strong { display: block; font-weight: 700; }
+  .resumo small { display: block; font-size: 12px; color: var(--tinta-3); }
+  .resumo .ok { color: var(--ok); } .resumo .alerta { color: var(--alerta); }
+  .dica-aba { padding: 18px 22px; background: var(--cor-suave); border-color: var(--cor-media); }
+  .dica-aba strong { display: block; color: var(--cor-texto); font-weight: 800; margin-bottom: 4px; }
+  .dica-aba p { font-size: 13px; color: var(--tinta-2); }
+  .escada { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 12px; }
+  .escada li { padding: 16px; border: 1px solid var(--borda); border-radius: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .escada li:first-child { background: var(--cor-suave); border-color: var(--cor-media); }
+  .escada b { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: var(--fundo); color: var(--tinta-2); }
+  .escada li:first-child b { background: var(--cor-forte, var(--cor)); color: var(--sobre-cor); }
+  .escada strong { font-weight: 800; line-height: 1.3; }
+  .escada span { font-size: 12px; color: var(--tinta-3); }
+  .rotulo-faixa { display: flex; justify-content: space-between; gap: 8px; }
+  .rotulo-faixa strong { color: var(--tinta); font-size: 14px; }
+  input.faixa { width: 100%; max-width: 420px; height: 28px; accent-color: var(--cor); }
+
+  .cabeca { flex-wrap: wrap; }
+  .origens { flex-basis: 100%; margin-top: 4px; padding-top: 18px; border-top: 1px solid var(--borda); }
+  .origens-topo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .origens-topo strong { font: 800 15px var(--titulo); }
+  .origens-barra { display: flex; gap: 3px; height: 10px; margin: 12px 0 10px; border-radius: 999px; overflow: hidden; }
+  .origens .legenda { margin: 0; }
+  #config-conteudo[data-aba="regras"] { grid-template-columns: minmax(0, 1fr); }
+  #cfg-partes .tabela th:first-child { width: 60%; }
+
+  /* ---------- carregando (esqueleto) ---------- */
+  .esqueleto { cursor: default; }
+  .osso { display: block; height: 12px; border-radius: 6px; background: var(--borda); animation: osso 1.2s ease-in-out infinite; }
+  .osso.bola { width: 18px; height: 18px; border-radius: 6px; flex: none; }
+  .osso + .osso { margin-top: 8px; }
+  .osso.curto { width: 55%; }
+  @keyframes osso { 50% { opacity: .45; } }
+  .coluna li { content-visibility: auto; contain-intrinsic-size: auto 30px; }
 
   @media (max-width: 1180px) {
     .ficha-grade { grid-template-columns: 1fr; }
     .passos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   @media (max-width: 900px) {
+    body { padding-left: 0; padding-bottom: 72px; }
+    .rail { top: auto; right: 0; width: auto; height: 68px; flex-direction: row; justify-content: space-around; padding: 6px 8px; }
+    .rail .sigla, .rail-espaco { display: none; }
+    .config-resumo { position: static; }
+    .abas { flex-wrap: nowrap; overflow-x: auto; }
+    .aba { flex: none; }
+    #config-conteudo[data-aba="regras"] { grid-template-columns: minmax(0, 1fr); }
     .cadastro, .config { grid-template-columns: 1fr; }
     .lista, .config-lado { position: static; max-height: none; }
     .grupos { max-height: 50vh; }
-    .cascata, .grade2, .grade3, .campos2 { grid-template-columns: 1fr; }
+    .cascata, .grade2, .grade3, .campos2, .rel-grade, .rel-grade.larga { grid-template-columns: 1fr; }
+    .numeros { grid-template-columns: 1fr 1fr; }
     #status { display: none; }
   }
-  @media (prefers-reduced-motion: reduce) { #status.trabalhando .ponto { animation: none; } .progresso span { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { #status.trabalhando .ponto, .autenticador .trabalhando .ponto { animation: none; } .progresso span, details.problema .seta, #relatorio-conteudo { transition: none; } .osso { animation: none; } }
 </style>
 </head>
 <body>
+<nav class="rail" aria-label="Menu principal">
+  <span class="sigla" id="sigla" aria-hidden="true">PJ</span>
+  <button class="nav-item" id="ir-cadastro" type="button" aria-current="true"></button>
+  <button class="nav-item" id="abrir-relatorio" type="button" aria-current="false"></button>
+  <button class="nav-item" id="abrir-config" type="button" aria-current="false"></button>
+  <span class="rail-espaco"></span>
+  <button class="nav-item" id="tema" type="button" aria-label="Alternar entre modo claro e escuro" title="Modo claro / escuro">
+      <svg class="sol" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      <svg class="lua" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    <span>Tema</span></button>
+</nav>
 <header class="topo">
   <div class="marca">
-    <span class="sigla" id="sigla" aria-hidden="true">PJ</span>
     <div><strong id="nome-escritorio">Cadastro no PJe</strong><small>Cadastro de processos no PJe do TJMT</small></div>
   </div>
   <div class="topo-direita">
     <button id="status" type="button"><span class="ponto"></span><span id="status-texto">Robô parado</span></button>
-    <button class="botao icone" id="tema" type="button" aria-label="Alternar entre modo claro e escuro" title="Modo claro / escuro">
-      <svg class="sol" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-      <svg class="lua" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-    </button>
-    <button class="botao" id="abrir-config" type="button"></button>
+    <button class="botao" id="sair" type="button" hidden>Sair</button>
   </div>
 </header>
 
@@ -327,7 +498,9 @@
     <div class="lista-topo">
       <h2>Clientes</h2>
       <span class="contagem" id="contagem">0</span>
+      <button class="botao icone" id="enviar-pastas" type="button" aria-label="Enviar pastas de clientes" title="Enviar pastas de clientes" hidden></button>
       <button class="botao icone" id="atualizar" type="button" aria-label="Ler as pastas de novo"></button>
+      <input type="file" id="escolher-pastas" webkitdirectory multiple hidden>
     </div>
     <div class="busca"><input id="filtro" type="search" placeholder="Filtrar clientes" aria-label="Filtrar clientes"></div>
     <div class="grupos" id="grupos"></div>
@@ -344,12 +517,13 @@
 </main>
 
 <main id="tela-config" class="config" hidden>
-  <aside class="config-lado">
-    <button class="voltar" id="fechar-config" type="button"></button>
-    <nav class="cartao" id="config-nav" aria-label="Seções das configurações"></nav>
-  </aside>
+  <div class="config-topo">
+    <h1>Ajustes</h1>
+    <p class="dica">Tudo o que o robô precisa saber do escritório. Fica só neste computador.</p>
+    <button class="voltar" id="fechar-config" type="button" hidden></button>
+  </div>
+  <nav class="abas" id="config-nav" aria-label="Seções dos ajustes"></nav>
   <section class="config-corpo">
-    <h1>Configurações</h1>
     <div id="config-conteudo"></div>
     <div class="barra-escura" id="salvar-barra" hidden>
       <span id="msg-salvar"></span>
@@ -357,6 +531,18 @@
       <button class="botao claro" id="salvar" type="button">Salvar alterações</button>
     </div>
   </section>
+  <aside class="config-resumo" id="config-resumo" aria-label="Resumo e ajuda"></aside>
+</main>
+
+<main id="tela-entrar" class="entrar" hidden></main>
+
+<main id="tela-relatorio" class="relatorio" hidden>
+  <div class="rel-topo">
+    <button class="voltar" id="fechar-relatorio" type="button" hidden></button>
+    <h1>Relatório do robô</h1>
+    <div class="periodos" id="periodos" role="group" aria-label="Período do relatório"></div>
+  </div>
+  <div id="relatorio-conteudo"></div>
 </main>
 
 <div class="aviso erro" id="toast" role="alert" hidden></div>
@@ -388,6 +574,7 @@ if (location.protocol === "file:") {
   throw new Error("Página aberta como arquivo: use o Abrir cadastro.bat.");
 }
 const ICONES = {
+  pessoas: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   ajustes: '<path d="M4 6h9"/><path d="M17 6h3"/><circle cx="15" cy="6" r="2"/><path d="M4 12h3"/><path d="M11 12h9"/><circle cx="9" cy="12" r="2"/><path d="M4 18h11"/><path d="M19 18h1"/><circle cx="17" cy="18" r="2"/>',
   recarregar: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
   voltar: '<path d="m15 18-6-6 6-6"/>',
@@ -398,16 +585,27 @@ const ICONES = {
   pasta: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   busca: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  enviar: '<path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/>',
+  grafico: '<path d="M3 3v18h18"/><path d="M8 17v-5"/><path d="M13 17V8"/><path d="M18 17v-9"/>',
 };
 function icone(nome, tamanho = 18) {
   const s = h("span", { "aria-hidden": "true", style: "display:inline-flex" });
   s.innerHTML = `<svg viewBox="0 0 24 24" width="${tamanho}" height="${tamanho}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONES[nome]}</svg>`;
   return s;
 }
-async function api(url, corpo) {
-  const r = await fetch(url, corpo === undefined ? {} :
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+async function api(url, corpo, segundos = 30) {
+  // tempo limite: se o programa travar ou fechar, a tela avisa em vez de ficar esperando para sempre
+  const ctl = new AbortController(), tempo = setTimeout(() => ctl.abort(), segundos * 1000);
+  let r;
+  try {
+    r = await fetch(url, corpo === undefined ? { signal: ctl.signal } :
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo), signal: ctl.signal });
+  } catch (e) {
+    throw new Error(e.name === "AbortError" ? `O programa não respondeu em ${segundos} segundos.`
+      : cfg && cfg.servidor ? "Sem conexão com o servidor. Confira a internet." : "Sem conexão com o programa. Ele está aberto?");
+  } finally { clearTimeout(tempo); }
   const dados = await r.json().catch(() => ({}));
+  if (r.status === 401 && dados.entrar) mostrarTela("entrar");  // servidor: sem sessão (ou ela venceu)
   if (!r.ok) throw new Error(dados.erro || `O servidor respondeu ${r.status}.`);
   return dados;
 }
@@ -481,20 +679,32 @@ function aplicarIdentidade() {
     : (palavras.slice(0, 2).map(p => p[0]).join("") || nome[0]).toUpperCase();
   document.title = (nome ? nome + ": " : "") + "Cadastro no PJe";
 }
-$("#abrir-config").append(icone("ajustes"), "Configurações");
+$("#ir-cadastro").append(icone("pessoas", 22), h("span", {}, "Cadastro"));
+$("#abrir-relatorio").append(icone("grafico", 22), h("span", {}, "Relatório"));
+$("#abrir-config").append(icone("ajustes", 22), h("span", {}, "Ajustes"));
+$("#ir-cadastro").addEventListener("click", () => mostrarTela("cadastro"));
 $("#fechar-config").append(icone("voltar"), "Voltar ao cadastro");
+$("#fechar-relatorio").append(icone("voltar"), "Voltar ao cadastro");
 $("#atualizar").append(icone("recarregar"));
+$("#enviar-pastas").append(icone("enviar"));
 $(".busca").prepend(icone("busca", 18));
+$("#abrir-relatorio").addEventListener("click", () => mostrarTela("relatorio"));
 $("#abrir-config").addEventListener("click", () => mostrarTela("config"));
 $("#fechar-config").addEventListener("click", () => mostrarTela("cadastro"));
+$("#fechar-relatorio").addEventListener("click", () => mostrarTela("cadastro"));
 $("#status").addEventListener("click", () => { if (est.pausa) mostrarTela("cadastro"); });
-$("#filtro").addEventListener("input", ev => { filtro = ev.target.value; desenharLista(); });
+let tempoFiltro = 0;  // espera a pessoa parar de digitar antes de redesenhar a lista
+$("#filtro").addEventListener("input", ev => { const v = ev.target.value; clearTimeout(tempoFiltro); tempoFiltro = setTimeout(() => { filtro = v; desenharLista(); }, 150); });
+const TELAS = ["cadastro", "config", "relatorio", "entrar"];
 function mostrarTela(qual) {
-  const trocou = $("#tela-config").hidden === (qual === "config");
-  $("#tela-cadastro").hidden = qual !== "cadastro";
-  $("#tela-config").hidden = qual !== "config";
-  $("#abrir-config").hidden = qual === "config";
-  if (qual === "config" && trocou) desenharConfig();
+  const trocou = $("#tela-" + qual).hidden;
+  for (const t of TELAS) $("#tela-" + t).hidden = t !== qual;
+  document.body.classList.toggle("entrando", qual === "entrar");
+  if (trocou && qual === "entrar") desenharEntrar();
+  [["cadastro", "#ir-cadastro"], ["relatorio", "#abrir-relatorio"], ["config", "#abrir-config"]]
+    .forEach(([t, id]) => $(id).setAttribute("aria-current", String(t === qual)));
+  if (trocou && qual === "config") desenharConfig();
+  if (trocou && qual === "relatorio") carregarRelatorio();
   if (trocou) window.scrollTo(0, 0);
   mostrarBarraSalvar();
 }
@@ -514,13 +724,16 @@ function resumoDoCliente(nome) {
   const n = c.anexos;
   return [partesDoNome(nome)[1], n == null ? "" : `${n} ${n === 1 ? "anexo" : "anexos"}`].filter(Boolean).join(" · ");
 }
+const esqueletoLista = () => h("div", { role: "status", "aria-label": "Lendo as pastas" },
+  [1, 2, 3, 4].map(() => h("div", { class: "item esqueleto" }, h("span", { class: "osso bola" }),
+    h("div", { class: "textos" }, h("span", { class: "osso" }), h("span", { class: "osso curto" })))));
 async function carregarClientes() {
-  encher($("#grupos"), h("div", { class: "vazio-lista" }, "Lendo as pastas..."));
+  if (!clientes.length) encher($("#grupos"), esqueletoLista());  // na primeira leitura: esqueleto no lugar da lista
   try {
     const r = await api("/api/clientes");
     clientes = r.clientes; raizClientes = r.raiz;
   } catch (e) { clientes = []; avisar(e.message); }
-  $("#atualizar").title = "Ler de novo a pasta " + raizClientes;
+  $("#atualizar").title = cfg && cfg.servidor ? "Ler a lista de novo" : "Ler de novo a pasta " + raizClientes;
   desenharLista();
   if (atual && !editando && (clientes.some(c => c.nome === atual) || est.resultados[atual])) abrirCliente(atual);
   if (!atual) desenharBoasVindas();
@@ -581,7 +794,8 @@ function desenharRodape() {
   $("#cadastrar").textContent = n ? `Cadastrar ${n} ${n === 1 ? "cliente" : "clientes"}` : "Nenhum cliente marcado";
   $("#atualizar").disabled = ocupado;
   $("#rodape-dica").textContent = est.tarefa === "mapear" ? "O robô está lendo as opções do PJe. Espere terminar para cadastrar."
-    : est.tarefa ? "Pode acompanhar no Chrome do robô. O registro do que ele fez nesta sessão está ao lado."
+    : est.tarefa ? (cfg && cfg.servidor ? "O registro do que o robô fez nesta sessão está ao lado."
+      : "Pode acompanhar no Chrome do robô. O registro do que ele fez nesta sessão está ao lado.")
     : "O robô deixa o processo como rascunho: não assina e não protocola.";
 }
 $("#atualizar").addEventListener("click", carregarClientes);
@@ -605,6 +819,7 @@ function desenharBoasVindas() {
   encher($("#ficha"), h("section", { class: "cartao boas-vindas" },
     h("h1", {}, clientes.length ? "Escolha um cliente na lista" : "Nenhum cliente para cadastrar"),
     h("p", {}, clientes.length ? "Você vê aqui o que o robô achou na petição inicial e pode corrigir antes de cadastrar."
+      : cfg && cfg.servidor ? "Arraste as pastas dos clientes para a lista ao lado (ou use o botão de enviar, no topo da lista). Cada cliente é uma pasta com a petição inicial e os anexos."
       : "Cada cliente é uma pasta dentro da pasta de clientes. O robô lê a petição inicial e, se houver, o documento de cadastro (.docx)."),
     h("div", { class: "exemplo" },
       h("div", { class: "pasta" }, icone("pasta", 16), "Maria da Silva [Ação de Cobrança]"),
@@ -676,11 +891,14 @@ function desenharFicha(nome, r) {
     return (controles[chave] = h("input", attrs));
   };
   const atencao = [];  // campos em amarelo: entram no aviso do topo
+  const origens = { corrigido: 0, docx: 0, inicial: 0, padrao: 0, conferir: 0 };  // de onde veio cada campo: resumo no topo da ficha
   const fld = (rotulo, chave, classe = "") => {
     const c = campos[chave] || {};
     let [tom, curto, longo] = origemDoCampo(c, motivos[chave]);
     if (chave === "raça" && !valor(chave)) [tom, curto, longo] = ["", "Padrão", "Vazio: o robô marca a raça/cor padrão do escritório."];
     if (tom === "alerta") atencao.push(rotulo);
+    const grupo = tom === "alerta" ? "conferir" : { "Corrigido": "corrigido", "Do .docx": "docx", "Padrão": "padrao" }[curto] || (curto ? "inicial" : "");
+    if (grupo) origens[grupo]++;
     const controle = montar(chave);
     controle.id = "c-" + chave;
     return h("div", { class: `fld ${classe} ${tom === "alerta" ? "alerta" : ""}` },
@@ -722,12 +940,17 @@ function desenharFicha(nome, r) {
     h("span", {}, "Você mudou dados deste cliente."),
     h("button", { class: "botao", type: "button", onclick: () => abrirCliente(nome) }, "Desfazer"),
     h("button", { class: "botao claro", type: "submit" }, "Salvar alterações"));
+  const lerFicha = () => {
+    const corpo = Object.fromEntries(new FormData(form));
+    form.querySelectorAll("input[data-simnao]").forEach(i => corpo[i.name] = i.checked ? "SIM" : "NÃO");
+    return corpo;
+  };
   const form = h("form", {
       oninput: () => { editando = true; barra.hidden = false; }, onchange: () => { editando = true; barra.hidden = false; },
       onsubmit: async ev => {
         ev.preventDefault();
-        const corpo = Object.fromEntries(new FormData(form));
-        form.querySelectorAll("input[data-simnao]").forEach(i => corpo[i.name] = i.checked ? "SIM" : "NÃO");
+        const corpo = lerFicha();
+        corpo._mudados = Object.keys(corpo).filter(k => corpo[k] !== comoVeio[k]);  // para o relatório: o que vocês corrigiram
         try {
           await api("/api/clientes/" + encodeURIComponent(nome) + "/corrigir", corpo);
           editando = false;
@@ -738,6 +961,7 @@ function desenharFicha(nome, r) {
     h("fieldset", { disabled: ocupado, style: "border:0;margin:0;padding:0;min-width:0;display:flex;flex-direction:column;gap:16px" },
       h("div", { class: "ficha-grade" }, processo, h("div", { class: "pilha" }, ativo, passivo)), documentos),
     erro, barra);
+  const comoVeio = lerFicha();
 
   const naLista = prontos().some(c => c.nome === nome) && !est.tarefa;
   const rotuloPular = () => desmarcados.has(nome) ? "Incluir no cadastro" : "Pular este cliente";
@@ -754,13 +978,38 @@ function desenharFicha(nome, r) {
             : h("span", { class: "chip", title: "Sem .docx de cadastro: tudo vem da petição inicial" }, "Sem .docx: tudo pela inicial"),
           r.rascunho ? h("span", { class: "chip", title: "O próximo cadastro continua deste rascunho, sem criar outro." },
             `Rascunho ${r.rascunho} no PJe`) : null)),
-      h("div", { class: "botoes" }, pular)),
+      h("div", { class: "botoes" }, pular, botaoApagar(nome, principal)), resumoOrigens(origens, !!r.problema)),
     res && res.situacao === "erro" ? h("div", { class: "aviso erro" }, icone("erro"), h("div", {}, h("strong", {}, "O último cadastro parou."),
       h("p", {}, res.msg + " Corrija o que for preciso e cadastre de novo: o robô continua o rascunho que já existe."))) : null,
     r.problema || n ? h("div", { class: "aviso" }, icone("alerta"), h("div", {},
       h("strong", {}, n ? `${n} ${n === 1 ? "campo precisa" : "campos precisam"} de você` : "Falta conferir"),
       h("p", {}, r.problema || `Confira ${atencao.join(", ")} antes de cadastrar.`))) : null,
     r.campos.length ? form : null);
+}
+// servidor: tirar o cliente da lista (vai para a Lixeira do escritório, que se esvazia sozinha)
+function botaoApagar(nome, principal) {
+  if (!cfg.servidor || est.tarefa || !clientes.some(c => c.nome === nome)) return null;
+  return h("button", { class: "botao", type: "button", onclick: async () => {
+    if (!confirm(`Mover ${principal} para a Lixeira? Ela se esvazia sozinha em 30 dias.`)) return;
+    try { await api("/api/clientes/" + encodeURIComponent(nome) + "/apagar", {}); atual = null; await carregarClientes(); }
+    catch (e) { avisar(e.message); }
+  } }, "Apagar este cliente");
+}
+// barra "de onde o robô tirou cada dado": a cor de cada fonte e quantos campos vieram dela
+function resumoOrigens(o, temAviso = false) {
+  const total = Object.values(o).reduce((a, b) => a + b, 0);
+  if (!total) return null;
+  const FONTES = [["corrigido", "Corrigido por você", "var(--ok)"], ["docx", "Do .docx", "var(--cor)"],
+    ["inicial", "Da inicial", "color-mix(in srgb, var(--cor) 45%, var(--superficie))"], ["padrao", "Padrão do escritório", "#A3ABBE"],
+    ["conferir", "Para conferir", "var(--alerta-forte)"]].filter(([k]) => o[k]);
+  const confirmados = total - o.conferir;
+  return h("div", { class: "origens" },
+    h("div", { class: "origens-topo" }, h("strong", {}, `${confirmados} de ${total} campos confirmados`),
+      h("span", { class: "dica" }, "de onde o robô tirou cada dado"),
+      temAviso && !o.conferir ? h("span", { class: "dica", style: "color:var(--alerta);font-weight:700" }, "e um item no aviso abaixo") : null),
+    h("div", { class: "origens-barra", role: "img", "aria-label": FONTES.map(([k, n]) => `${n}: ${o[k]}`).join(", ") },
+      FONTES.map(([k, , c]) => h("span", { style: `flex:${o[k]};background:${c}` }))),
+    h("div", { class: "legenda" }, FONTES.map(([k, n, c]) => h("span", {}, h("i", { style: `--c:${c}` }), `${n} · ${o[k]}`))));
 }
 function desenharConcluido(nome, res) {
   encher($("#ficha"),
@@ -816,9 +1065,13 @@ function desenharAndamento() {
         h("h2", {}, icone("alerta", 20), "O robô parou e precisa de você"),
         h("p", { class: "sub" }, `${partesDoNome(est.atual)[0]}: etapa ${p.etapa} de ${est.etapas.length} (${curta(p.nome)})`),
         h("p", { class: "problema" }, p.problema),
+        // no servidor ninguém mexe no Chrome do robô: a pessoa resolve no PJe dela, no rascunho que o robô criou
+        cfg.servidor && p.rascunho ? h("p", {}, h("a", { href: p.rascunho, target: "_blank", rel: "noopener" }, "Abrir o rascunho no PJe"),
+          ". Resolva lá e depois clique em continuar.") : null,
         h("div", { class: "botoes" },
           h("button", { class: "botao principal", type: "button", onclick: () => responder("repetir") }, "Tentar de novo"),
-          h("button", { class: "botao", type: "button", onclick: () => responder("continuar") }, "Já fiz no PJe, continuar"),
+          !cfg.servidor ? h("button", { class: "botao", type: "button", onclick: () => responder("continuar") }, "Já fiz no PJe, continuar")
+            : p.rascunho ? h("button", { class: "botao", type: "button", onclick: () => responder("continuar") }, "Já resolvi no meu PJe, continuar") : null,
           h("button", { class: "botao", type: "button", onclick: () => responder("pular") }, "Pular este cliente")),
         p.foto ? h("img", { src: "/api/foto/" + encodeURIComponent(p.foto), alt: "Como estava a tela do PJe quando o robô parou",
           onclick: () => window.open("/api/foto/" + encodeURIComponent(p.foto)) }) : null), cartaoRegistro);
@@ -841,13 +1094,23 @@ function desenharAndamento() {
     P.rotulo.textContent = est.atual ? "No PJe agora" : "Começando";
     P.titulo.textContent = est.atual ? partesDoNome(est.atual)[0] : "Entrando no PJe...";
     P.posicao.textContent = fila.length && pos ? `Cliente ${pos} de ${fila.length}` : "";
-    P.sub.textContent = "Pode acompanhar no Chrome do robô. Ele deixa o processo como rascunho: não assina e não protocola.";
+    P.sub.textContent = (cfg && cfg.servidor ? "" : "Pode acompanhar no Chrome do robô. ") + "Ele deixa o processo como rascunho: não assina e não protocola.";
     const { atualN, feitas } = est.atual ? etapaAtual() : { atualN: 0, feitas: 0 }, total = est.etapas.length || 6;
     P.barra.style.width = `${Math.round(100 * (feitas + (atualN > feitas ? 0.5 : 0)) / total)}%`;
-    encher(P.passos, est.etapas.map((nome, i) => {
+    const assinatura = `${feitas}|${atualN}|${est.etapas.length}`;  // só refaz as etapas quando alguma muda
+    if (P.assinatura !== assinatura) P.assinatura = assinatura, encher(P.passos, est.etapas.map((nome, i) => {
       const classe = i + 1 <= feitas ? "feito" : i + 1 === atualN ? "atual" : "";
       return h("li", { class: classe }, classe === "feito" ? icone("certo", 18) : h("span", { class: "marca-passo" }), curta(nome));
     }));
+  } else if (est.tarefa === "autenticador") {
+    const link = (est.autenticador || {}).etapa === "link";
+    P.rotulo.textContent = "Login do PJe";
+    P.titulo.textContent = link ? "Esperando o link do e-mail" : "Configurando o código do PJe";
+    P.posicao.textContent = "";
+    encher(P.sub, link ? "Cole o link em Ajustes > Escritório e acesso. " : cfg && cfg.servidor ? "" : "Pode acompanhar no Chrome do robô. ",
+      h("button", { class: "link", type: "button", onclick: () => { abaConfig = "acesso"; mostrarTela("config"); desenharConfig(); } },
+        "Abrir Ajustes"));
+    P.barra.style.width = link ? "50%" : "20%";
   } else {
     const prog = [...logLinhas].reverse().map(l => l.match(/\((\d+)\/(\d+)\) (.+?):/)).find(Boolean);
     P.rotulo.textContent = "Opções do PJe";
@@ -860,7 +1123,8 @@ function desenharAndamento() {
 async function atualizarEstado() {
   let r;
   try { r = await api("/api/estado?desde=" + logLinhas.length); }
-  catch { $("#status").className = "esperando"; $("#status-texto").textContent = "Sem conexão: abra o programa de novo"; return; }
+  catch { $("#status").className = "esperando";
+    $("#status-texto").textContent = cfg && cfg.servidor ? "Robô reiniciando: tentando de novo" : "Sem conexão: abra o programa de novo"; return; }
   logLinhas.push(...r.log);
   escreverNoRegistro(r.log);
   const tarefaAntes = est.tarefa, atualAntes = est.atual, resultadosAntes = Object.keys(est.resultados).length;
@@ -868,36 +1132,75 @@ async function atualizarEstado() {
   est = r;
   $("#status").className = r.pausa ? "esperando" : r.tarefa ? "trabalhando" : "";
   $("#status-texto").textContent = r.pausa ? "Esperando você" : r.tarefa === "mapear" ? "Lendo as opções do PJe"
-    : r.tarefa === "cadastrar" ? "Cadastrando agora" : "Robô parado";
+    : r.tarefa === "cadastrar" ? "Cadastrando agora" : r.autenticador && r.autenticador.etapa === "link" ? "Esperando o link do e-mail"
+    : r.tarefa === "autenticador" ? "Configurando o código" : "Robô parado";
   desenharAndamento();
+  if (marcaAutenticador() !== autenticadorDesenhado) desenharAutenticador();
   if (tarefaAntes !== r.tarefa || atualAntes !== r.atual || resultadosAntes !== Object.keys(r.resultados).length || r.pausa
       || etapaAntes !== etapaAtual().atualN) desenharLista();
   if (tarefaAntes && !r.tarefa) tarefaAntes === "mapear" ? carregarMapa() : carregarClientes();
 }
 
 // ---------- configurações: todas as seções numa página ----------
-let rotulos = [], partes = [], dicionario = [], secao = "escritorio", haMudancas = false, observador = null;
-const SECOES_CONFIG = [
-  ["escritorio", "Escritório"], ["login", "Login do PJe"], ["documentos", "Pastas e documentos"],
-  ["padrao", "Padrão do escritório"], ["dicionario", "Dicionário"], ["partes", "Réus conhecidos"], ["pje", "Opções do PJe"]];
-function desenharConfig() {
-  const construir = { escritorio: cfgEscritorio, login: cfgLogin, documentos: cfgDocumentos, padrao: cfgPadrao,
-    dicionario: cfgDicionario, partes: cfgPartes, pje: cfgPje };
-  encher($("#config-conteudo"), SECOES_CONFIG.map(([chave]) => construir[chave]()));
-  encher($("#config-nav"), SECOES_CONFIG.map(([chave, nome]) => h("button", { type: "button", "data-secao": chave, "aria-current": chave === secao,
-    onclick: () => {
-      secao = chave; marcarNav();
-      document.getElementById("cfg-" + chave).scrollIntoView({ block: "start",
-        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-    } }, nome)));
-  if (observador) observador.disconnect();
-  observador = new IntersectionObserver(entradas => {
-    const visivel = entradas.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-    if (visivel) { secao = visivel.target.id.slice(4); marcarNav(); }
-  }, { rootMargin: "-100px 0px -65% 0px" });
-  document.querySelectorAll(".secao-cfg").forEach(s => observador.observe(s));
+let rotulos = [], partes = [], dicionario = [], abaConfig = "acesso", haMudancas = false;
+const ABAS_CONFIG = [
+  ["acesso", "Escritório e acesso", ["escritorio", "login"]],
+  ["pastas", "Pastas e documentos", ["documentos"]],
+  ["regras", "Regras do robô", ["ordem", "dicionario", "padrao", "partes"]],
+  ["pje", "Opções do PJe", ["pje"]]];
+const DICAS_SERVIDOR = {
+  acesso: ["Seus dados ficam protegidos", "A senha e a chave do autenticador ficam guardadas no cofre de senhas do servidor, só para o seu escritório, e não aparecem de novo depois de salvas."],
+  pastas: ["Dica de ritmo", "No servidor ninguém acompanha o Chrome do robô: com 0 segundos os cadastros ficam bem mais rápidos."]};
+const DICAS_ABA = {
+  acesso: ["Seus dados ficam aqui", "A senha e a chave do autenticador ficam só neste computador e não aparecem de novo depois de salvas."],
+  pastas: ["Dica de ritmo", "Para acompanhar o robô no Chrome, use de 3 a 5 segundos. Quando já confiar nele, baixe para 0 e os cadastros ficam bem mais rápidos."],
+  regras: ["Como o dicionário decide", "Vale a primeira regra, de cima para baixo, em que todas as palavras aparecem na inicial. Uma palavra só basta quando ela aparece apenas nesse tipo de ação."],
+  pje: ["Para que serve esta aba", "Aqui você só consulta o que o PJe aceita: escolha uma matéria e veja jurisdições, competências e classes. Releia quando o tribunal mudar a tela de Novo processo."]};
+// situação de cada aba: [pronta?, texto curto]
+function situacaoAba(chave) {
+  const p = (cfg && cfg.pje) || {};
+  if (chave === "acesso") return p.cpf && p.tem_senha && p.tem_totp ? [true, "Login e autenticador guardados"]
+    : !(p.cpf && p.tem_senha) ? [false, "Falta o CPF ou a senha do PJe"] : [false, "Falta o código de 2 fatores"];
+  if (chave === "pastas") return cfg && cfg.pasta_clientes ? [true, `${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"} na pasta`]
+    : [false, "Escolha a pasta dos clientes"];
+  if (chave === "regras") return [true, `${dicionario.length} no dicionário, ${partes.length} ${partes.length === 1 ? "réu conhecido" : "réus conhecidos"}`];
+  return materias().length ? [true, `Lidas em ${mapa.atualizado_em}`] : [false, "Ainda não lidas do PJe"];
 }
-function marcarNav() { document.querySelectorAll("#config-nav button").forEach(b => b.setAttribute("aria-current", String(b.dataset.secao === secao))); }
+function desenharConfig() {
+  const construir = { escritorio: cfgEscritorio, login: cfgLogin, documentos: cfgDocumentos, ordem: cfgOrdem, padrao: cfgPadrao,
+    dicionario: cfgDicionario, partes: cfgPartes, pje: cfgPje };
+  const secoes = (ABAS_CONFIG.find(a => a[0] === abaConfig) || ABAS_CONFIG[0])[2];
+  $("#config-conteudo").dataset.aba = abaConfig;
+  encher($("#config-conteudo"), secoes.map(chave => construir[chave]()));
+  encher($("#config-nav"), ABAS_CONFIG.map(([chave, nome]) => {
+    const [pronta] = situacaoAba(chave);
+    return h("button", { type: "button", class: "aba", "aria-current": chave === abaConfig,
+      onclick: () => { abaConfig = chave; desenharConfig(); window.scrollTo(0, 0); } }, nome,
+      chave === "regras" ? h("span", { class: "conta" }, dicionario.length + partes.length)
+        : h("i", { class: "ponto-aba" + (pronta ? "" : " alerta"), title: pronta ? "Pronto" : "Falta algo" }));
+  }));
+  desenharResumo();
+  desenharAutenticador();
+}
+function desenharResumo() {
+  const caixa = $("#config-resumo");
+  if (!caixa || !cfg) return;
+  const [titulo, texto] = cfg.servidor && DICAS_SERVIDOR[abaConfig] || DICAS_ABA[abaConfig];
+  encher(caixa, h("section", { class: "cartao resumo" }, h("h2", {}, "Está tudo pronto?"),
+      ABAS_CONFIG.map(([chave, nome]) => {
+        const [pronta, sub] = situacaoAba(chave);
+        return h("button", { type: "button", onclick: () => { abaConfig = chave; desenharConfig(); window.scrollTo(0, 0); } },
+          h("span", { class: pronta ? "ok" : "alerta" }, icone(pronta ? "certo" : "alerta", 18)),
+          h("span", {}, h("strong", {}, nome), h("small", {}, sub)));
+      })),
+    h("section", { class: "cartao dica-aba" }, h("strong", {}, titulo), h("p", {}, texto)));
+}
+function cfgOrdem() {
+  return secaoCfg("ordem", "Quem manda em cada campo", "Quando duas fontes discordam, vale a de cima.",
+    h("ol", { class: "escada" }, [["Correção na ficha", "O que você mudou na tela do cliente"],
+      ["Documento .docx", "O cadastro que acompanha a pasta"], ["Inicial + dicionário", "O que o robô lê e as regras abaixo"],
+      ["Padrão do escritório", "Só quando nada acima respondeu"]].map(([t, d], i) => h("li", {}, h("b", {}, String(i + 1)), h("strong", {}, t), h("span", {}, d)))));
+}
 function secaoCfg(id, titulo, intro, ...corpo) {
   return h("section", { class: "cartao secao-cfg", id: "cfg-" + id }, h("h2", {}, titulo),
     intro ? h("p", { class: "intro" }, intro) : null, h("div", { class: "corpo" }, corpo));
@@ -926,35 +1229,105 @@ function seletorDeCor() {
   return caixa;
 }
 function cfgEscritorio() {
-  return secaoCfg("escritorio", "Escritório", "Como o programa se apresenta para quem usa. Tudo fica só neste computador.",
+  return secaoCfg("escritorio", "Escritório", "Como o programa se apresenta para quem usa. " + (cfg.servidor ? "Fica no servidor, só para o seu escritório." : "Tudo fica só neste computador."),
     campo("Nome do escritório", ligado("nome", { placeholder: "ex.: Silva & Souza Advogados" }, v => v, aplicarIdentidade)),
     campo("Cor do escritório", seletorDeCor(), "Aparece no símbolo e nos botões principais."));
 }
 function cfgLogin() {
   const senha = h("input", { type: "password", autocomplete: "new-password", value: pjeDigitado.senha,
     placeholder: cfg.pje.tem_senha ? "guardada (deixe em branco para manter)" : "não preenchida", oninput: ev => { pjeDigitado.senha = ev.target.value; mudou(); } });
-  const totp = h("input", { type: "password", autocomplete: "off", value: pjeDigitado.totp_key,
+  const totp = h("input", { id: "c-totp", type: "password", autocomplete: "off", value: pjeDigitado.totp_key,
     placeholder: cfg.pje.tem_totp ? "guardada (deixe em branco para manter)" : "não preenchida", oninput: ev => { pjeDigitado.totp_key = ev.target.value; mudou(); } });
   return secaoCfg("login", "Login do PJe", "O robô entra no PJe com CPF, senha e o código do autenticador, sem certificado digital. A senha não aparece aqui depois de salva.",
     h("div", { class: "grade2" },
       campo("CPF", h("input", { class: "mono", inputmode: "numeric", value: pjeDigitado.cpf, oninput: ev => { pjeDigitado.cpf = ev.target.value; mudou(); } })),
       campo("Senha do PJe", senha)),
-    campo("Chave do autenticador", totp, "O código secreto do app autenticador (2 fatores), não os 6 números."));
+    campo("Chave do autenticador", totp, "Se você já tem a chave do app autenticador (2 fatores), cole aqui. Não são os 6 números."),
+    h("div", { class: "autenticador", id: "autenticador" }));
+}
+
+// ---------- o robô configura o código de 2 fatores (primeiro acesso / chave perdida) ----------
+let autenticadorDesenhado = null, qrMostrado = null;
+const marcaAutenticador = () => ((est.autenticador || {}).etapa || "") + (est.tarefa === "autenticador" ? ":rodando" : "");
+async function acaoAutenticador(url, corpo) {
+  try { await api(url, corpo); await atualizarEstado(); } catch (e) { avisar(e.message); }
+}
+// o QR e a chave do robô, para o celular ler: todos que lerem geram o mesmo código
+const blocoQR = (qr, chave) => h("div", { class: "qr-bloco" }, qr ? h("img", { class: "qr", src: qr, alt: "QR do autenticador do PJe" }) : null,
+  h("div", {}, h("p", { class: "dica" }, "No app (Google Authenticator, Microsoft Authenticator...), toque em adicionar e "
+    + (qr ? "leia este QR. Ou digite a chave:" : "digite a chave:")),
+    h("p", { class: "mono", style: "font-size:16px;margin-top:6px" }, chave)));
+const AVISO_NOVO_DISPOSITIVO = "Não peça \"Configurar novo dispositivo\" no PJe para pôr o código em outro celular: isso derruba todos os outros, "
+  + "inclusive o robô. Use o botão \"Mostrar o QR para outro celular\" aqui.";
+function desenharAutenticador() {
+  const caixa = $("#autenticador");
+  if (!caixa) return;
+  autenticadorDesenhado = marcaAutenticador();
+  const a = est.autenticador || {}, rodando = est.tarefa === "autenticador";
+  const cancelar = h("button", { class: "botao", type: "button", onclick: () => acaoAutenticador("/api/parar", {}) }, "Cancelar");
+  if (a.etapa === "link") {
+    const link = h("input", { type: "url", placeholder: "https://sso.cloud.pje.jus.br/...", "aria-label": "Link do e-mail do PJe" });
+    const enviar = () => link.value.trim() && acaoAutenticador("/api/autenticador/link", { link: link.value.trim() });
+    link.addEventListener("keydown", ev => { if (ev.key === "Enter") enviar(); });
+    encher(caixa, h("strong", {}, "Cole aqui o link do e-mail do PJe"),
+      h("p", { class: "dica" }, a.pediu ? "O robô clicou em \"Configurar novo dispositivo\" e o PJe mandou um e-mail para o advogado. Abra o e-mail, copie o link e cole aqui. O robô faz o resto."
+        : "Não achei no PJe o \"Configurar novo dispositivo\". Peça pelo PJe e cole aqui o link que chegar por e-mail."),
+      h("div", { class: "linha" }, link, h("button", { class: "botao principal", type: "button", onclick: enviar }, "Enviar"), cancelar));
+    return link.focus();
+  }
+  if (rodando) return encher(caixa, h("div", { class: "trabalhando" }, h("span", { class: "ponto" }), "O robô está no PJe configurando o código..."),
+    cfg.servidor ? null : h("p", { class: "dica" }, "Pode acompanhar no Chrome do robô."), h("div", { class: "linha" }, cancelar));
+  if (a.etapa === "pronto") {
+    cfg.pje.tem_totp = true;
+    if ($("#c-totp")) $("#c-totp").placeholder = "guardada (deixe em branco para manter)";
+    return encher(caixa, h("div", { class: "aviso ok" }, icone("certo"), h("div", {}, h("strong", {}, "Pronto: o robô já gera o código sozinho."),
+        h("p", {}, "O dispositivo novo substitui o antigo: o código que estava no celular parou de valer."))),
+      h("strong", {}, "Agora escaneie no app autenticador de cada celular que entra nesta conta"),
+      blocoQR(a.qr, a.chave),
+      h("p", { class: "dica" }, "Assim o advogado entra pelo celular e o robô entra sozinho, com o mesmo código. " + AVISO_NOVO_DISPOSITIVO),
+      h("div", { class: "linha" }, h("button", { class: "botao principal", type: "button", onclick: () => acaoAutenticador("/api/autenticador/fechar", {}) }, "Já escaneei")));
+  }
+  if (qrMostrado && !a.etapa) return encher(caixa, h("strong", {}, "Para pôr o código em outro celular"), blocoQR(qrMostrado.qr, qrMostrado.chave),
+    h("p", { class: "dica" }, "Quem ler este QR gera o mesmo código que o robô, e ninguém sai."),
+    h("div", { class: "linha" }, h("button", { class: "botao", type: "button", onclick: () => { qrMostrado = null; desenharAutenticador(); } }, "Fechar")));
+  const falta = !(cfg.pje.cpf && cfg.pje.tem_senha) ? "Salve o CPF e a senha primeiro." : haMudancas ? "Salve as alterações primeiro."
+    : est.tarefa ? "Espere o robô terminar o que está fazendo." : "";
+  const mostrarQR = async () => {
+    try { qrMostrado = await api("/api/autenticador/qr"); desenharAutenticador(); } catch (e) { avisar(e.message); }
+  };
+  encher(caixa,
+    a.etapa === "erro" ? h("div", { class: "aviso erro" }, icone("erro"), h("p", {}, a.msg)) : null,
+    cfg.pje.tem_totp ? [h("strong", {}, "Precisa do código em outro celular?"),
+      h("p", { class: "dica" }, "Mostre o QR do robô e leia com o app autenticador. Todos ficam com o mesmo código e ninguém sai."),
+      h("div", { class: "linha" }, h("button", { class: "botao", type: "button", onclick: mostrarQR }, "Mostrar o QR para outro celular")),
+      h("hr", { class: "divisor", style: "margin:8px 0" })] : null,
+    h("strong", {}, cfg.pje.tem_totp ? "A chave do robô parou de valer?" : "Não sabe a chave?"),
+    h("p", { class: "dica" }, "O robô configura sozinho: entra no PJe, clica em \"Configurar novo dispositivo\" e se cadastra como autenticador. Você só cola o link que o PJe manda por e-mail. "
+      + "Atenção: pedir dispositivo novo derruba todos os outros (celulares e robô). No fim, cada celular lê o QR do robô e tudo volta a funcionar com um código só."),
+    h("div", { class: "linha" }, h("button", { class: "botao principal", type: "button", disabled: !!falta,
+      onclick: () => acaoAutenticador("/api/autenticador", {}) }, a.etapa === "erro" ? "Tentar de novo" : "Configurar o código pelo robô"),
+      falta ? h("span", { class: "dica" }, falta) : null));
 }
 function cfgDocumentos() {
   const exemplo = h("span", { class: "dica" });
   const atualizarExemplo = () => exemplo.textContent = `Ex.: "${cfg.prefixo_anexo || ""} 01] Documentos pessoais.pdf" é o 1º anexo. O PDF que não começa assim é a petição inicial.`;
   atualizarExemplo();
   const tipoAnexo = chave => escolha(chave, cfg[chave], tiposDocumento(), { aoMudar: ev => { cfg[chave] = ev.target.value; mudou(); } });
-  return secaoCfg("documentos", "Pastas e documentos", "Onde estão os clientes e como o escritório organiza os arquivos de cada um.",
-    campo("Pasta dos clientes", ligado("pasta_clientes", { class: "mono" }), "Cada cliente é uma pasta aqui dentro. Os já cadastrados vão para a subpasta Concluído."),
+  return secaoCfg("documentos", "Pastas e documentos", cfg.servidor ? "Como o escritório organiza os arquivos de cada cliente."
+      : "Onde estão os clientes e como o escritório organiza os arquivos de cada um.",
+    cfg.servidor ? null : campo("Pasta dos clientes", ligado("pasta_clientes", { class: "mono" }), "Cada cliente é uma pasta aqui dentro. Os já cadastrados vão para a subpasta Concluído."),
     h("div", { class: "grade3" },
       campo("O nome dos anexos começa com", ligado("prefixo_anexo", {}, v => v, atualizarExemplo)),
       campo("Tipo do 1º anexo no PJe", tipoAnexo("anexo_primeiro")),
       campo("Tipo dos demais anexos", tipoAnexo("anexo_demais"))),
     exemplo,
-    campo("Pausa entre as ações (segundos)", ligado("pausa_segundos", { type: "number", min: 0, max: 10, step: 0.5, style: "max-width:140px" }, Number),
-      "Mais tempo deixa acompanhar no Chrome. 0 é o mais rápido."),
+    (() => {
+      const fmt = v => `${String(v ?? 0).replace(".", ",")} ${Number(v) === 1 ? "segundo" : "segundos"}`;
+      const valor = h("strong", {}, fmt(cfg.pausa_segundos));
+      return campo(h("span", { class: "rotulo-faixa" }, "Pausa entre as ações do robô", valor),
+        ligado("pausa_segundos", { type: "range", class: "faixa", min: 0, max: 10, step: 0.5 }, Number, () => valor.textContent = fmt(cfg.pausa_segundos)),
+        "0 é o mais rápido. De 3 a 5 segundos dá para acompanhar no Chrome.");
+    })(),
     h("h3", {}, "Modelo do documento de cadastro (.docx)"),
     h("p", { class: "dica" }, "O robô lê do .docx as linhas \"Rótulo: valor\" e as tabelas de duas colunas. Se o modelo do escritório chama um campo por outro nome, ensine aqui. Entre parênteses está o rótulo que ele já entende sozinho."),
     tabelaDePares(rotulos, [["rotulo", "Rótulo no seu documento", { placeholder: "ex.: Nome do Autor" }],
@@ -1023,7 +1396,7 @@ function cfgPje() {
       h("li", { class: clicavel ? "" : "texto" }, clicavel ? h("button", { type: "button", "aria-pressed": selPje[chave] === i, onclick: () => aoEscolher(i) }, i) : i)));
     desenharItens();
     return h("div", { class: "coluna" }, h("h3", {}, titulo),
-      h("input", { placeholder: "Filtrar", "aria-label": "Filtrar " + titulo, value: filtroPje[chave], oninput: ev => { filtroPje[chave] = ev.target.value; desenharItens(); } }), ul);
+      h("input", { placeholder: "Filtrar", "aria-label": "Filtrar " + titulo, value: filtroPje[chave], oninput: ev => { filtroPje[chave] = ev.target.value; clearTimeout(ul.tempo); ul.tempo = setTimeout(desenharItens, 150); } }), ul);
   };
   const desenharColunas = () => encher(colunas,
     coluna("Matéria", "m", ms, true, v => { selPje.m = v; selPje.j = selPje.c = null; desenharColunas(); }),
@@ -1035,7 +1408,7 @@ function cfgPje() {
     h("ul", { style: "height:220px" }, itens.map(i => h("li", { class: "texto" }, i))));
   return secaoCfg("pje", "Opções do PJe", ms.length ? `Lidas do PJe em ${mapa.atualizado_em}: ${ms.length} matérias, ${nJ} jurisdições e ${nK} classes. É daqui que saem as listas de escolha do programa.`
       : "As opções do PJe ainda não foram lidas. Sem elas, os campos de matéria, jurisdição, competência e classe ficam como texto livre.",
-    h("div", { class: "ler" },
+    cfg.servidor ? h("p", { class: "dica" }, "No servidor, o administrador atualiza as opções do PJe.") : h("div", { class: "ler" },
       h("div", { style: "flex-basis:100%" }, h("h3", { style: "margin:0" }, "Ler de novo do PJe"),
         h("p", { class: "dica" }, "Faça quando o tribunal mudar a tela de Novo processo. O robô percorre as listas sem incluir nada; leva uns 45 minutos e dá para continuar de onde parou. Com o número de um rascunho criado depois de 23/10/2026, lê também os tipos de documento, as prioridades e os tipos de parte.")),
       campo("Número de um rascunho", rascunho),
@@ -1052,7 +1425,11 @@ function cfgPje() {
 
 // ---------- salvar a configuração ----------
 let pjeDigitado = { cpf: "", senha: "", totp_key: "" };
-function mudou() { haMudancas = true; $("#msg-salvar").textContent = "Há alterações não salvas."; $("#msg-salvar").style.color = ""; mostrarBarraSalvar(); }
+function mudou() {
+  haMudancas = true; $("#msg-salvar").textContent = "Há alterações não salvas."; $("#msg-salvar").style.color = ""; mostrarBarraSalvar();
+  if (!est.tarefa) desenharAutenticador();  // o botão do código espera salvar o CPF e a senha
+  desenharResumo();
+}
 function mostrarBarraSalvar() { $("#salvar-barra").hidden = !(haMudancas && !$("#tela-config").hidden); }
 async function carregarEscritorio() {
   cfg = await api("/api/escritorio");
@@ -1063,9 +1440,98 @@ async function carregarEscritorio() {
   dicionario = cfg.dicionario.map(t => ({ frases: t.frases.join("; "), assunto: t.assunto || "", materia: t.materia || "" }));
   pjeDigitado = { cpf: cfg.pje.cpf, senha: "", totp_key: "" };
   haMudancas = false;
-  aplicarIdentidade(); mostrarBarraSalvar();
+  aplicarIdentidade(); aplicarServidor(); mostrarBarraSalvar();
   if (!$("#tela-config").hidden) desenharConfig();
 }
+// ---------- servidor: entrar, sair e enviar pastas ----------
+function aplicarServidor() {
+  $("#sair").hidden = $("#enviar-pastas").hidden = !cfg.servidor;
+  if (cfg.servidor) $(".config-topo .dica").textContent = "Tudo o que o robô precisa saber do escritório. Fica no servidor, só para o seu escritório.";
+}
+function desenharEntrar() {
+  const email = h("input", { type: "email", autocomplete: "username", required: true });
+  const senha = h("input", { type: "password", autocomplete: "current-password", required: true });
+  const msg = h("div", { class: "aviso erro", role: "alert", hidden: true });
+  const mostrar = (texto, ok) => { msg.className = "aviso " + (ok ? "ok" : "erro"); encher(msg, icone(ok ? "certo" : "erro"), h("p", { style: "margin:0" }, texto)); msg.hidden = false; };
+  const botao = h("button", { class: "botao principal grande", type: "submit" }, "Entrar");
+  encher($("#tela-entrar"), h("form", { class: "cartao", onsubmit: async ev => {
+    ev.preventDefault(); botao.disabled = true;
+    try { await api("/entrar", { email: email.value, senha: senha.value }); location.reload(); }
+    catch (e) { mostrar(e.message); botao.disabled = false; }
+  } },
+    h("h1", {}, "Cadastro no PJe"), h("p", { class: "dica", style: "margin:0" }, "Entre com o e-mail e a senha do seu escritório."),
+    campo("E-mail", email), campo("Senha", senha), msg, botao,
+    h("button", { class: "link", type: "button", onclick: async () => {
+      if (!email.value) return mostrar("Escreva o seu e-mail acima e clique de novo em Esqueci a senha.");
+      try { await api("/esqueci", { email: email.value }); mostrar("Se o e-mail estiver cadastrado, chega um link para criar uma senha nova.", true); }
+      catch (e) { mostrar(e.message); }
+    } }, "Esqueci a senha")));
+  email.focus();
+}
+$("#sair").addEventListener("click", async () => { try { await api("/sair", {}); } finally { location.reload(); } });
+// arrastar pastas: lê cada pasta solta (readEntries devolve em lotes; repete até vir vazio)
+async function arquivosDoArraste(itens) {
+  const lista = [];
+  async function ler(entrada) {
+    if (entrada.isFile) lista.push([await new Promise((ok, erro) => entrada.file(ok, erro)), entrada.fullPath.replace(/^\//, "")]);
+    else if (entrada.isDirectory) {
+      const leitor = entrada.createReader();
+      for (let lote; (lote = await new Promise((ok, erro) => leitor.readEntries(ok, erro))).length;)
+        for (const e of lote) await ler(e);
+    }
+  }
+  const entradas = [...itens].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);  // antes do 1º await
+  for (const e of entradas) await ler(e);
+  return lista;
+}
+const ARQUIVOS_DO_ROBO = ["rascunho.json", "correcoes.json"];
+function caminhoAceito(caminho) {
+  const partes = caminho.normalize("NFC").split(/[\\/]/).filter(Boolean), nome = partes[partes.length - 1] || "";
+  return partes.length >= 2 && partes.length <= 3
+    && !partes.some(p => ["Concluído", "Lixeira", ".", ".."].includes(p) || /[\x00-\x1f<>:"|?*]/.test(p))
+    && (/\.(pdf|docx)$/i.test(nome) || ARQUIVOS_DO_ROBO.includes(nome));
+}
+async function enviarPastas(selecionados) {
+  if (!selecionados.length) return;
+  // ex.: escolher a pasta-mãe traz Concluído e a pasta do robô local (com a senha do PJe): nada disso sai daqui
+  const lista = selecionados.filter(([, c]) => caminhoAceito(c)), fora = selecionados.filter(([, c]) => !caminhoAceito(c)).map(([, c]) => c);
+  if (!lista.length) return avisar("Nenhum arquivo .pdf ou .docx dentro de pastas de clientes. Cada cliente é uma pasta com a petição e os anexos.");
+  const corpo = new FormData();
+  for (const [arquivo, caminho] of lista) { corpo.append("arquivos", arquivo, arquivo.name); corpo.append("caminhos", caminho); }
+  const botao = $("#enviar-pastas"), ctl = new AbortController(), tempo = setTimeout(() => ctl.abort(), 600000);
+  botao.disabled = true; botao.title = `Enviando ${lista.length} ${lista.length === 1 ? "arquivo" : "arquivos"}...`;
+  try {
+    const r = await fetch("/api/clientes/enviar", { method: "POST", body: corpo, signal: ctl.signal });
+    const dados = await r.json().catch(() => ({}));
+    if (r.status === 401 && dados.entrar) return mostrarTela("entrar");
+    if (!r.ok) throw new Error(dados.erro || `O servidor respondeu ${r.status}.`);
+    const n = dados.clientes.length, ig = fora.concat(dados.ignorados);
+    informar(`${n} ${n === 1 ? "pasta enviada" : "pastas enviadas"}: ${dados.clientes.join(", ")}.` + (ig.length
+      ? ` Ficaram de fora (só vale .pdf e .docx dentro da pasta do cliente): ${ig.slice(0, 5).join(", ")}${ig.length > 5 ? "..." : ""}` : ""));
+    await carregarClientes();
+  } catch (e) { avisar(e.name === "AbortError" ? "O envio passou de 10 minutos e foi cancelado. Envie menos pastas de cada vez." : e.message); }
+  finally { clearTimeout(tempo); botao.disabled = false; botao.title = "Enviar pastas de clientes"; }
+}
+$("#enviar-pastas").addEventListener("click", () => $("#escolher-pastas").click());
+$("#escolher-pastas").addEventListener("change", ev => {
+  const lista = [...ev.target.files].map(f => [f, f.webkitRelativePath || f.name]);
+  ev.target.value = "";
+  enviarPastas(lista);
+});
+const areaDeSoltar = $(".lista");
+areaDeSoltar.addEventListener("dragover", ev => {
+  if (!cfg || !cfg.servidor || !ev.dataTransfer.types.includes("Files")) return;
+  ev.preventDefault(); areaDeSoltar.classList.add("soltando");
+});
+areaDeSoltar.addEventListener("dragleave", ev => { if (!areaDeSoltar.contains(ev.relatedTarget)) areaDeSoltar.classList.remove("soltando"); });
+areaDeSoltar.addEventListener("drop", async ev => {
+  if (!cfg || !cfg.servidor) return;
+  ev.preventDefault(); areaDeSoltar.classList.remove("soltando");
+  enviarPastas(await arquivosDoArraste(ev.dataTransfer.items));
+});
+// arquivo solto fora da lista não abre no lugar da página
+window.addEventListener("dragover", ev => { if (cfg && cfg.servidor) ev.preventDefault(); });
+window.addEventListener("drop", ev => { if (cfg && cfg.servidor) ev.preventDefault(); });
 $("#descartar").addEventListener("click", carregarEscritorio);
 $("#salvar").addEventListener("click", async () => {
   const { campos, pessoas, pje, ...resto } = cfg;
@@ -1093,9 +1559,130 @@ async function carregarMapa() {
   encher($("#dl-tipos-parte"), tipos.map(t => h("option", { value: t })));
   if (!$("#tela-config").hidden) desenharConfig();
 }
+// ---------- relatório ----------
+const PERIODOS = [["mes", "Este mês"], ["mes_passado", "Mês passado"], ["30", "Últimos 30 dias"], ["tudo", "Tudo"]];
+let periodoRel = "mes";
+const RESULTADO = { pronto: ["ok", "Pronto"], pulado: ["alerta", "Pulado"], erro: ["erro", "Parou com erro"], parado: ["neutra", "Parado por vocês"] };
+const dataCurta = q => `${q.slice(8, 10)}/${q.slice(5, 7)} ${q.slice(11, 16)}`;
+const duracao = s => s < 60 ? `${s} s` : `${Math.round(s / 60)} min`;
+const vezes = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+const soNome = nome => partesDoNome(nome || "")[0];
+
+async function carregarRelatorio() {
+  encher($("#periodos"), PERIODOS.map(([v, rotulo]) => h("button", { type: "button", "aria-pressed": v === periodoRel,
+    onclick: () => { periodoRel = v; carregarRelatorio(); } }, rotulo)));
+  const caixa = $("#relatorio-conteudo");
+  caixa.classList.add("carregando");  // o relatório anterior fica, apagado, até chegar o novo
+  try { desenharRelatorio(await api("/api/relatorio?periodo=" + periodoRel)); }
+  catch (e) { avisar(e.message); }
+  finally { caixa.classList.remove("carregando"); }
+}
+
+// barra de um gráfico: a dica (valor|rótulo) aparece ao passar o mouse ou com Tab
+const segmento = (n, cor, maximo, dica) => n ? h("span", { class: "seg", style: `--c:${cor};width:${100 * n / maximo}%`, tabindex: 0,
+  "data-dica": dica, "aria-label": dica.replace("|", " ") }) : null;
+
+function desenharRelatorio(r) {
+  const caixa = $("#relatorio-conteudo");
+  if (!r.eventos) return encher(caixa, h("section", { class: "cartao boas-vindas" },
+    h("h1", {}, r.tem_historico ? "Nada neste período" : "O relatório começa a contar agora"),
+    h("p", { style: "max-width:70ch;margin:0 auto" }, r.tem_historico ? "Escolha outro período acima."
+      : "A cada cliente, o robô anota quanto tempo levou, onde precisou de vocês e o que resolveu sozinho; a cada ficha salva, "
+      + "os campos que vocês corrigiram. Cadastre alguns clientes e volte aqui.")));
+
+  const numero = (rotulo, valor, sub) => h("section", { class: "cartao numero" }, h("div", { class: "rot" }, rotulo),
+    h("div", { class: "val" }, valor), h("div", { class: "sub" }, sub));
+  const numeros = h("div", { class: "numeros" },
+    numero("Cadastrados", r.prontos, r.nao_terminaram ? `e ${vezes(r.nao_terminaram, "que não terminou", "que não terminaram")}` : "nenhum ficou pela metade"),
+    numero("Sem nenhuma pausa", r.sem_pausa == null ? "—" : r.sem_pausa + "%", "o robô fez do começo ao fim"),
+    numero("Tempo por cliente", r.minutos == null ? "—" : `${r.minutos.toLocaleString("pt-BR")} min`, "em média, dos que ficaram prontos"),
+    numero("Pausas", r.pausas, r.sozinho ? `e mais ${r.sozinho} que o robô resolveu sozinho` : "pedindo ajuda a vocês"));
+
+  const maxEtapa = Math.max(1, ...r.etapas.map(e => e.pausas + e.sozinho));
+  const engasga = h("section", { class: "cartao rel-bloco" }, h("h2", {}, "Onde o robô engasga"),
+    h("p", { class: "intro" }, "Por etapa do cadastro no PJe. O que mais precisa de vocês é o que vale melhorar primeiro."),
+    h("div", { class: "legenda" }, h("span", {}, h("i", { style: "--c:var(--s-voce)" }), "Precisou de vocês"),
+      h("span", {}, h("i", { style: "--c:var(--s-sozinho)" }), "Resolveu sozinho")),
+    h("div", { class: "barras" }, r.etapas.map(e => h("div", { class: "barra-linha" },
+      h("span", { class: "rotulo", title: e.etapa }, curta(e.etapa)),
+      h("span", { class: "trilho" },
+        segmento(e.pausas, "var(--s-voce)", maxEtapa, `${vezes(e.pausas, "pausa", "pausas")}|${curta(e.etapa)}: precisou de vocês`),
+        segmento(e.sozinho, "var(--s-sozinho)", maxEtapa, `${vezes(e.sozinho, "vez", "vezes")}|${curta(e.etapa)}: resolveu sozinho`)),
+      h("span", { class: "valor" }, e.pausas || e.sozinho ? [String(e.pausas), e.sozinho ? h("small", {}, ` + ${e.sozinho} sozinho`) : null]
+        : h("small", {}, "nada"))))));
+
+  const problemas = h("section", { class: "cartao rel-bloco" }, h("h2", {}, "Problemas que mais se repetem"),
+    h("p", { class: "intro" }, "Clique para ver a mensagem e a tela do PJe da última vez."),
+    r.problemas.length ? h("div", { class: "problemas" }, r.problemas.map(p => {
+      const foto = p.foto ? h("img", { alt: "Tela do PJe na última pausa por este problema", title: "Abrir a foto inteira",
+        onerror: ev => ev.target.remove(), onclick: ev => window.open(ev.target.src) }) : null;
+      const contagem = [p.pausas && vezes(p.pausas, "pausa", "pausas"), p.sozinho && `${p.sozinho} resolvido${p.sozinho > 1 ? "s" : ""} sozinho`,
+        p.erros && vezes(p.erros, "parada com erro", "paradas com erro")].filter(Boolean).join(" · ");
+      const quem = p.clientes.slice(0, 3).map(soNome).join(", ") + (p.clientes.length > 3 ? ` e mais ${p.clientes.length - 3}` : "");
+      return h("details", { class: "problema", ontoggle: ev => {
+          if (ev.target.open && foto && !foto.getAttribute("src")) foto.src = "/api/foto/" + encodeURIComponent(p.foto); } },
+        h("summary", {}, h("span", { class: "seta" }, icone("voltar", 16)),
+          h("div", { class: "textos" }, h("strong", {}, p.tipo), h("div", { class: "sub" }, `${contagem} · ${quem}`)),
+          h("span", { class: "vezes", title: vezes(p.vezes, "vez", "vezes") }, p.vezes)),
+        h("div", { class: "detalhe" },
+          h("div", { class: "dica" }, `Última vez: ${dataCurta(p.ultima.quando)} · ${soNome(p.ultima.cliente)}`
+            + (p.ultima.etapa ? ` · ${curta(p.ultima.etapa)}` : "")),
+          h("p", {}, p.ultima.texto), foto));
+    })) : h("p", { class: "dica" }, "Nenhum problema neste período."));
+
+  const maxCampo = Math.max(1, ...r.campos.map(c => c.vezes));
+  const campos = h("section", { class: "cartao rel-bloco" }, h("h2", {}, "Campos que vocês mais corrigem"),
+    h("p", { class: "intro" }, "Na ficha do cliente, antes de cadastrar: mostra o que o robô mais erra ao ler a inicial."),
+    r.campos.length ? h("div", { class: "barras" }, r.campos.slice(0, 8).map(c => h("div", { class: "barra-linha" },
+      h("span", { class: "rotulo", title: c.campo }, c.campo),
+      h("span", { class: "trilho" }, segmento(c.vezes, "var(--s-voce)", maxCampo, `${vezes(c.vezes, "correção", "correções")}|${c.campo}`)),
+      h("span", { class: "valor" }, c.vezes)))) : h("p", { class: "dica" }, "Nenhuma correção neste período."));
+
+  const ultimos = h("section", { class: "cartao rel-bloco" }, h("h2", {}, "Últimos cadastros"),
+    h("p", { class: "intro" }, "Os 20 mais recentes do período. Passe o mouse no resultado para ver a mensagem."),
+    r.ultimos.length ? h("table", { class: "tabela rel-tabela" },
+      h("thead", {}, h("tr", {}, h("th", {}, "Cliente"), h("th", {}, "Quando"), h("th", {}, "Tempo"), h("th", {}, "Resultado"))),
+      h("tbody", {}, r.ultimos.map(c => {
+        const [tom, rotulo] = RESULTADO[c.resultado] || ["neutra", c.resultado];
+        const extra = c.resultado === "pronto" ? (c.pausas ? ` · ${vezes(c.pausas, "pausa", "pausas")}` : "") : c.etapa ? ` em ${curta(c.etapa)}` : "";
+        return h("tr", {}, h("td", {}, soNome(c.cliente)), h("td", { class: "num" }, dataCurta(c.quando)), h("td", { class: "num" }, duracao(c.segundos)),
+          h("td", {}, h("span", { class: "pilula " + tom, title: c.msg || null }, h("span", { class: "ponto" }), rotulo + extra)));
+      }))) : h("p", { class: "dica" }, "Nenhum cadastro neste período."));
+
+  encher(caixa, numeros, h("div", { class: "rel-grade" }, engasga, problemas), h("div", { class: "rel-grade larga" }, campos, ultimos));
+}
+
+// dica dos gráficos: valor em destaque, depois o que é
+const dicaGrafico = h("div", { class: "dica-grafico", role: "tooltip", hidden: true });
+document.body.append(dicaGrafico);
+function mostrarDica(ev) {
+  const alvo = ev.target.closest && ev.target.closest("[data-dica]");
+  dicaGrafico.hidden = !alvo;
+  if (!alvo) return;
+  const [valor, rotulo] = alvo.dataset.dica.split("|");
+  encher(dicaGrafico, h("i", { style: `background:${getComputedStyle(alvo).backgroundColor}` }), h("strong", {}, valor), h("span", {}, rotulo));
+  const caixa = alvo.getBoundingClientRect();
+  const x = ev.clientX ?? caixa.left + caixa.width / 2, y = ev.clientY ?? caixa.top;
+  dicaGrafico.style.left = Math.min(x + 12, innerWidth - dicaGrafico.offsetWidth - 8) + "px";
+  dicaGrafico.style.top = y - dicaGrafico.offsetHeight - 10 + "px";
+}
+document.addEventListener("pointermove", mostrarDica);
+document.addEventListener("focusin", mostrarDica);
+document.addEventListener("focusout", () => dicaGrafico.hidden = true);
+
+function informar(msg) {
+  escreverNoRegistro([msg]);
+  const t = $("#toast");
+  t.className = "aviso ok";
+  encher(t, icone("certo"), h("p", {}, msg), h("button", { class: "botao fantasma", type: "button", onclick: () => t.hidden = true }, "Fechar"));
+  t.hidden = false;
+  clearTimeout(avisar.tempo);
+  avisar.tempo = setTimeout(() => t.hidden = true, 10000);
+}
 function avisar(msg) {
   escreverNoRegistro(["ERRO: " + msg]);
   const t = $("#toast");
+  t.className = "aviso erro";
   encher(t, icone("erro"), h("p", {}, msg), h("button", { class: "botao fantasma", type: "button", onclick: () => t.hidden = true }, "Fechar"));
   t.hidden = false;
   clearTimeout(avisar.tempo);
@@ -1113,11 +1700,20 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
 });
 
 (async () => {
-  await carregarEscritorio();
-  await carregarMapa();
-  await atualizarEstado();
+  try { await carregarEscritorio(); }
+  catch (e) {
+    if (!$("#tela-entrar").hidden) return;  // servidor sem sessão: fica na tela de entrar
+    avisar(e.message + " A página tenta de novo em 15 segundos.");  // ex.: o robô do escritório reiniciando
+    return setTimeout(() => location.reload(), 15000);
+  }
+  await Promise.all([carregarMapa(), atualizarEstado()]);  // independentes: em paralelo (#16)
   await carregarClientes();
-  setInterval(atualizarEstado, 1000);
+  let consultando = false, ultima = 0;
+  setInterval(async () => {
+    if (consultando || !$("#tela-entrar").hidden || (document.hidden && Date.now() - ultima < 5000)) return;
+    consultando = true; ultima = Date.now();
+    try { await atualizarEstado(); } finally { consultando = false; }
+  }, 1000);
 })();
 </script>
 </body>

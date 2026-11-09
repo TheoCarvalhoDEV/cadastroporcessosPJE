@@ -1,0 +1,7 @@
+# HTTPS automático (Let's Encrypt). ROBO_DOMINIO vem de /etc/systemd/system/caddy.service.d/robo.conf (montar.sh).
+{$ROBO_DOMINIO} {
+	request_body {
+		max_size 210MB
+	}
+	reverse_proxy 127.0.0.1:8800
+}

@@ -1,0 +1,9 @@
+[Unit]
+Description=Limpeza diária do robô de cadastro no PJe
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

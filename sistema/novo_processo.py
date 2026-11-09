@@ -11,7 +11,9 @@ import re
 import sys
 import json
 import time
+import base64
 import functools
+from urllib.parse import urljoin
 import unicodedata
 import docx
 import pyotp
@@ -20,7 +22,13 @@ from playwright.sync_api import sync_playwright, Error as ErroDoNavegador, Timeo
 
 SISTEMA = os.path.dirname(os.path.abspath(__file__))  # o código (vai igual para todo escritório)
 PASTA = os.path.dirname(SISTEMA)                       # a pasta do robô; as pastas de clientes ficam ao lado dela
-DADOS = os.path.join(PASTA, "dados_do_escritorio")     # deste escritório: login, configuração, Chrome, fotos das pausas
+# No servidor (servidor/robo@.service) cada escritório roda um processo com ROBO_SERVIDOR=1 e a própria ROBO_DADOS;
+# sem essas variáveis é o modo local de sempre.
+SERVIDOR = os.environ.get("ROBO_SERVIDOR") == "1"
+DADOS = os.environ.get("ROBO_DADOS") or os.path.join(PASTA, "dados_do_escritorio")  # login, configuração, Chrome, fotos
+ARQUIVO_CONFIG = os.path.join(DADOS, "config.json")    # login do PJe no modo local
+# login do PJe no servidor: um segredo por escritório no Secret Manager (nunca no disco nem nos snapshots)
+SEGREDO = f"projects/{os.environ.get('ROBO_PROJETO', '')}/secrets/pje-login-{os.environ.get('ROBO_ESCRITORIO', '')}"
 URL_LOGIN = "https://pje.tjmt.jus.br/pje/login.seam"
 # Mesmo link do menu "Processo > Novo processo"
 URL_NOVO_PROCESSO = "https://pje.tjmt.jus.br/pje/Processo/cadastrar.seam?newInstance=true"
@@ -80,6 +88,7 @@ CAMPOS_OBRIGATORIOS = [
 avisos = []
 
 ARQUIVO_ESCRITORIO = os.path.join(DADOS, "escritorio.json")
+ARQUIVO_HISTORICO = os.path.join(DADOS, "historico.jsonl")  # um acontecimento por linha: a tela Relatório soma daqui
 
 
 def carregar_escritorio():
@@ -116,6 +125,10 @@ carregar_escritorio()
 
 class Problema(Exception):
     """O que o robô não resolve sozinho (dado errado, PJe recusou...): pausa e pergunta o que fazer."""
+
+
+class Pulado(SystemExit):
+    """Responderam 'Pular este cliente' numa pausa (para o relatório separar de erro)."""
 
 
 class PJeInstavel(Exception):
@@ -446,7 +459,7 @@ def pastas_de_clientes(raiz):
         return any((f.lower().endswith(".docx") and not f.startswith("~$"))
                    or (f.lower().endswith(".pdf") and numero_do_anexo(f) is None) for f in os.listdir(pasta))
     return sorted(os.path.join(raiz, n) for n in os.listdir(raiz)
-                  if n != "Concluído" and os.path.join(raiz, n) != PASTA and os.path.isdir(os.path.join(raiz, n))
+                  if n not in ("Concluído", "Lixeira") and os.path.join(raiz, n) != PASTA and os.path.isdir(os.path.join(raiz, n))
                   and eh_cliente(os.path.join(raiz, n)))
 
 
@@ -595,10 +608,16 @@ def abrir_navegador():
     global _playwright
     if _playwright is None:
         _playwright = sync_playwright().start()
+    args = ["--disable-blink-features=AutomationControlled", "--disable-notifications"]
+    # no servidor não há tela: Chrome sem janela num tamanho fixo (as fotos das pausas saem iguais às do escritório)
+    # em português e no horário de Cuiabá: o serviço do servidor não tem idioma, e o robô reconhece as mensagens do
+    # PJe pelo texto ("Código inválido"); em inglês ele não reconheceria e tentaria o código de novo
+    tela = dict(headless=True, viewport={"width": 1366, "height": 768}, locale="pt-BR",
+                timezone_id="America/Cuiaba") if SERVIDOR else \
+        dict(headless=False, no_viewport=True, args=["--start-maximized"] + args)
     try:
         contexto = _playwright.chromium.launch_persistent_context(
-            os.path.join(DADOS, "Perfil_PJe"), channel="chrome", headless=False, no_viewport=True,
-            args=["--start-maximized", "--disable-blink-features=AutomationControlled", "--disable-notifications"],
+            os.path.join(DADOS, "Perfil_PJe"), channel="chrome", **{"args": args, **tela},
             ignore_default_args=["--enable-automation"])
     except ErroDoNavegador as e:
         if "is not found" in str(e):
@@ -638,58 +657,121 @@ def logado(d):
     return bool(d.query_selector("[id='tabConsultaProcesso_lbl']") or d.query_selector("a[href*='logout.seam']"))
 
 
+@functools.cache
+def cliente_segredos():
+    from google.cloud import secretmanager  # só o servidor precisa da biblioteca
+    return secretmanager.SecretManagerServiceClient()
+
+
+def ler_config():
+    """Login do PJe deste escritório: cpf, senha, totp_key (e totp_qr). Modo local: config.json; servidor: o
+    segredo do escritório no Secret Manager. Escritório novo, que ainda não salvou o login: {}."""
+    if SERVIDOR:
+        from google.api_core.exceptions import NotFound
+        try:
+            versao = cliente_segredos().access_secret_version(request={"name": SEGREDO + "/versions/latest"})
+        except NotFound:
+            return {}
+        return json.loads(versao.payload.data)
+    try:
+        with open(ARQUIVO_CONFIG, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+
+def gravar_config(config):
+    """Grava o login do PJe. No servidor, cria a versão nova do segredo e destrói as anteriores (a senha velha
+    não fica guardada)."""
+    if SERVIDOR:
+        cliente = cliente_segredos()
+        nova = cliente.add_secret_version(request={"parent": SEGREDO, "payload": {
+            "data": json.dumps(config, ensure_ascii=False).encode("utf-8")}})
+        for v in cliente.list_secret_versions(request={"parent": SEGREDO, "filter": "state:ENABLED"}):
+            if v.name != nova.name:
+                cliente.destroy_secret_version(request={"name": v.name})
+        return
+    with open(ARQUIVO_CONFIG + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+    os.replace(ARQUIVO_CONFIG + ".tmp", ARQUIVO_CONFIG)
+
+
+ERRO_LOGIN = "#input-error, #input-error-otp-code, .kc-feedback-text, .alert-error, #mensagemErroLogin, .rich-messages"
+NOVO_AUTENTICADOR = "#kc-totp-settings-form"  # página do QR: o PJe quer um autenticador novo (pediram 'Configurar novo dispositivo')
+CONFIGURE_NO_ROBO = "Em Configurações > Login do PJe, clique em 'Configurar o código pelo robô'."
+
+
+def mensagens_da_tela(d):
+    return " ".join(e.inner_text().strip() for e in d.query_selector_all(ERRO_LOGIN) if e.inner_text().strip())
+
+
+def cpf_e_senha(d, config):
+    """Tela de login: CPF, senha e Entrar. Devolve a tela seguinte: 'codigo', 'novo autenticador' ou 'logado'."""
+    d.goto(URL_LOGIN)
+    # O perfil pode já ter sessão ativa: espera o formulário de login OU o painel
+    esperar_ate(lambda: d.query_selector("#username") or logado(d))
+    if logado(d):
+        return "logado"
+    log("Fazendo login (CPF e senha)...")
+    for tentativa in range(3):  # a tela de login às vezes se redesenha enquanto o robô digita
+        try:
+            visivel(d, "#username").fill(re.sub(r"\D", "", config["cpf"]))
+            visivel(d, "#password").fill(config["senha"])
+            break
+        except ErroDoNavegador:
+            if tentativa == 2:
+                raise
+            d.wait_for_timeout(2000)
+    # O PJe alterna entre duas telas de login: a nova (botão kc-login) e a antiga loginOld.seam (botão btnEntrar,
+    # visto em 20/10/2026). Clica no botão que existir.
+    botao = next((e for e in d.query_selector_all("#kc-login, #btnEntrar, input[type='submit'][value='Entrar']")
+                  if e.is_visible()), None)
+    if not botao:
+        sys.exit("A tela de login do PJe mudou: não achei o botão Entrar. Entre à mão no Chrome do robô e tente de novo.")
+    botao.click()
+    # depois da senha: o código de 2 fatores, a página do QR (dispositivo novo pedido) ou, às vezes, direto o painel
+    try:
+        esperar_ate(lambda: d.query_selector("#otp") or d.query_selector(NOVO_AUTENTICADOR) or logado(d)
+                    or mensagens_da_tela(d), 60)
+    except TempoEsgotado:
+        sys.exit("Depois do CPF e senha o PJe mostrou uma tela que o robô não conhece. Termine o login à mão no "
+                 "Chrome do robô e tente de novo.")
+    if d.query_selector("#otp"):
+        return "codigo"
+    if d.query_selector(NOVO_AUTENTICADOR):
+        return "novo autenticador"
+    if logado(d):
+        return "logado"
+    sys.exit(f"O PJe recusou o login: {mensagens_da_tela(d)}")
+
+
 def entrar(d):
     """Login por CPF + senha + código TOTP (sem certificado). Os três vêm do config.json.
     Se a sessão ainda estiver ativa, só confere o painel."""
-    try:
-        with open(os.path.join(DADOS, "config.json"), encoding="utf-8") as f:
-            config = json.load(f)
-    except FileNotFoundError:  # escritório novo: ainda não salvou o login
-        config = {}
-    faltando = [k for k in ("cpf", "senha", "totp_key") if not config.get(k)]
-    if faltando:
-        sys.exit("Falta o login do PJe (CPF, senha e chave do autenticador). Preencha em Configurações > Login do PJe "
-                 "e clique em Salvar alterações.")
+    config = ler_config()
+    if not (config.get("cpf") and config.get("senha")):
+        sys.exit("Falta o login do PJe (CPF e senha). Preencha em Configurações > Login do PJe e clique em Salvar alterações.")
     try:
         if logado(d):  # recuperando no meio do cadastro com a sessão viva: não precisa logar de novo
             return d
     except ErroDoNavegador:
         pass
-    d.goto(URL_LOGIN)
-    # O perfil pode já ter sessão ativa: espera o formulário de login OU o painel
-    esperar_ate(lambda: d.query_selector("#username") or logado(d))
-    if not logado(d):
-        log("Fazendo login (CPF e senha)...")
-        for tentativa in range(3):  # a tela de login às vezes se redesenha enquanto o robô digita
-            try:
-                visivel(d, "#username").fill(re.sub(r"\D", "", config["cpf"]))
-                visivel(d, "#password").fill(config["senha"])
-                break
-            except ErroDoNavegador:
-                if tentativa == 2:
-                    raise
-                d.wait_for_timeout(2000)
-        # O PJe alterna entre duas telas de login: a nova (botão kc-login) e a antiga loginOld.seam (botão btnEntrar,
-        # visto em 20/10/2026). Clica no botão que existir.
-        botao = next((e for e in d.query_selector_all("#kc-login, #btnEntrar, input[type='submit'][value='Entrar']")
-                      if e.is_visible()), None)
-        if not botao:
-            sys.exit("A tela de login do PJe mudou: não achei o botão Entrar. Entre à mão no Chrome do robô e tente de novo.")
-        botao.click()
-        # depois da senha vem o código de 2 fatores (às vezes não pede); erro de senha aparece na própria página
-        erro_login = "#input-error, .kc-feedback-text, .alert-error, #mensagemErroLogin, .rich-messages"
+    tela = cpf_e_senha(d, config)
+    if tela == "novo autenticador":  # não conclui sozinho no meio do cadastro: trocaria o código do celular do advogado
+        sys.exit("O PJe está pedindo para cadastrar um autenticador novo (alguém clicou em 'Configurar novo dispositivo'). "
+                 + CONFIGURE_NO_ROBO)
+    if tela == "codigo":
+        if not config.get("totp_key"):
+            sys.exit("Falta a chave do autenticador do PJe. " + CONFIGURE_NO_ROBO)
+        visivel(d, "#otp").fill(pyotp.TOTP(config["totp_key"]).now())
+        visivel(d, "xpath=//input[@type='submit' or @value='VALIDAR' or @value='Validar']").click()
         try:
-            esperar_ate(lambda: d.query_selector("#otp") or logado(d)
-                        or [e for e in d.query_selector_all(erro_login) if e.inner_text().strip()], 60)
+            esperar_ate(lambda: logado(d) or mensagens_da_tela(d), 40)
         except TempoEsgotado:
-            sys.exit("Depois do CPF e senha o PJe mostrou uma tela que o robô não conhece. Termine o login à mão no "
-                     "Chrome do robô e tente de novo.")
-        if d.query_selector("#otp"):
-            visivel(d, "#otp").fill(pyotp.TOTP(config["totp_key"]).now())
-            visivel(d, "xpath=//input[@type='submit' or @value='VALIDAR']").click()
-        elif not logado(d):
-            msg = " ".join(e.inner_text() for e in d.query_selector_all(erro_login) if e.inner_text().strip())
-            sys.exit(f"O PJe recusou o login: {msg}")
+            pass  # a espera abaixo dá o erro de tempo (e o cadastro tenta de novo)
+        if "inválido" in mensagens_da_tela(d).lower():
+            sys.exit("O PJe recusou o código do autenticador: a chave guardada não vale mais (alguém configurou um "
+                     "dispositivo novo?). " + CONFIGURE_NO_ROBO)
     esperar_ate(lambda: logado(d), 40)
     if "QuadroAviso" in d.url:  # aviso novo do tribunal: o robô segue, mas mostra no Console
         titulos = [e.inner_text().strip() for e in d.query_selector_all(
@@ -700,8 +782,80 @@ def entrar(d):
     return d
 
 
-def navegador():
-    """O Chrome do robô, logado. Se a janela foi fechada, abre outro e faz o login."""
+def chave_do_texto(textos):
+    """A chave que o PJe mostra em 'Não foi possível ler o código QR?': 32 letras/números em grupos de 4."""
+    return next((t.replace(" ", "") for t in textos if re.fullmatch(r"[A-Z2-7]{4}( [A-Z2-7]{4}){5,}", t.strip())), None)
+
+
+def configurar_codigo(d, pedir_link, guardar):
+    """Primeiro acesso ou chave perdida: cadastra o robô como autenticador do PJe (2 fatores).
+    Depois do CPF e senha, se o PJe pedir o código, clica em 'Configurar novo dispositivo' e espera o link do e-mail
+    (pedir_link(pediu) devolve o link colado na interface); se já mostrar a página do QR, segue direto. Na página do
+    QR lê a chave e o QR da MESMA abertura (cada abertura gera outra chave), chama guardar(chave, qr) ANTES de concluir
+    (se algo cair depois, a chave não se perde) e conclui com o código gerado da chave. O dispositivo novo substitui o
+    antigo: o celular precisa escanear o mesmo QR."""
+    config = ler_config()
+    if not (config.get("cpf") and config.get("senha")):
+        sys.exit("Salve o CPF e a senha do PJe antes de configurar o código.")
+    sair = d.query_selector("a[href*='logout.seam']") if logado(d) else None
+    if sair:  # com a sessão aberta o PJe não mostra a tela do código: sai antes
+        log("Saindo do PJe para configurar o código...")
+        d.goto(urljoin(d.url, sair.get_attribute("href")))
+    tela = cpf_e_senha(d, config)
+    if tela == "logado":
+        sys.exit("O PJe entrou sem pedir o código de 2 fatores: não há o que configurar.")
+    if tela == "codigo":
+        pedir = next((e for e in d.query_selector_all("a, button") if e.is_visible()
+                      and "novo dispositivo" in (e.inner_text() or "").lower()), None)
+        if pedir:
+            log("Pedindo ao PJe um dispositivo novo (o PJe manda um e-mail com o link)...")
+            pedir.click()
+            d.wait_for_timeout(3000)
+            campo = d.query_selector("#username")  # se o PJe perguntar de quem é a conta
+            if campo and campo.is_visible():
+                campo.fill(re.sub(r"\D", "", config["cpf"]))
+                next(e for e in d.query_selector_all("input[type='submit'], button[type='submit']") if e.is_visible()).click()
+                d.wait_for_timeout(3000)
+            aviso = mensagens_da_tela(d)
+            if aviso:
+                log(f"  O PJe disse: {aviso}")
+        else:
+            log("Não achei no PJe o 'Configurar novo dispositivo': peça pelo PJe e cole o link do e-mail.")
+        if not d.query_selector(NOVO_AUTENTICADOR):
+            d.goto(pedir_link(bool(pedir)))
+            try:
+                esperar_ate(lambda: d.query_selector(NOVO_AUTENTICADOR), 60)
+            except TempoEsgotado:
+                sys.exit(f"O link não abriu a página do QR (pode ter expirado ou já ter sido usado). {mensagens_da_tela(d)} "
+                         "Clique em 'Configurar o código pelo robô' de novo.")
+    log("Lendo a chave na página do QR...")
+    imagem = d.query_selector("#kc-totp-secret-qr-code, img[alt*='Barcode']")  # o QR (alt 'Figure: Barcode' no PJe)
+    qr = (imagem.get_attribute("src") or "") if imagem else ""
+    qr = qr if qr.startswith("data:image") else ""
+    segredo = d.query_selector("input[name='totpSecret']")  # a mesma chave do QR, escondida no formulário
+    if segredo and segredo.get_attribute("value"):
+        chave = base64.b32encode(segredo.get_attribute("value").encode()).decode().rstrip("=")
+    else:  # sem o campo escondido: a chave em texto; o QR desta abertura já não vale
+        clicar(d, "#mode-manual")
+        chave = esperar_ate(lambda: chave_do_texto(d.evaluate(
+            "() => [...document.querySelectorAll('p, span, code, strong, div')].map(e => e.innerText.trim())")), 30)
+        qr = ""
+    guardar(chave, qr)
+    log("Cadastrando o robô como autenticador...")
+    visivel(d, "#totp").fill(pyotp.TOTP(chave).now())
+    visivel(d, "#saveTOTPBtn").click()
+    try:
+        esperar_ate(lambda: logado(d) or mensagens_da_tela(d) or not d.query_selector(NOVO_AUTENTICADOR), 60)
+    except TempoEsgotado:
+        pass
+    if d.query_selector(NOVO_AUTENTICADOR):
+        sys.exit(f"O PJe não aceitou o cadastro do autenticador: {mensagens_da_tela(d) or 'sem mensagem'}.")
+    log("Autenticador cadastrado: o robô já gera o código sozinho.")
+    return chave, qr
+
+
+def navegador(logar=True):
+    """O Chrome do robô, logado. Se a janela foi fechada, abre outro e faz o login (logar=False: só abre)."""
     global navegador_atual
     if navegador_atual is not None:
         try:
@@ -715,8 +869,19 @@ def navegador():
         except Exception:
             pass
     log("Abrindo o Chrome do robô...")
-    navegador_atual = entrar(abrir_navegador())
+    navegador_atual = entrar(abrir_navegador()) if logar else abrir_navegador()
     return navegador_atual
+
+
+def fechar_navegador():
+    """Fecha o Chrome do robô (no servidor, quando a fila do escritório acaba: libera memória para os outros)."""
+    global navegador_atual
+    if navegador_atual is not None:
+        try:
+            navegador_atual.context.close()
+        except Exception:  # já fechado
+            pass
+    navegador_atual = None
 
 
 # ---------- utilitários de tela ----------
@@ -734,6 +899,18 @@ def pedir_ajuda(etapa, nome_etapa, problema, foto):
 
 def log(msg):
     saida(f"[{time.strftime('%H:%M:%S')}] {msg}")
+
+
+def anotar(tipo, **campos):
+    """Guarda um acontecimento (cadastro, pausa, resolvido sozinho, correção) no histórico deste escritório.
+    Se não der para gravar, o cadastro segue."""
+    linha = json.dumps({"tipo": tipo, "quando": time.strftime("%Y-%m-%dT%H:%M:%S"), **campos}, ensure_ascii=False)
+    try:
+        os.makedirs(os.path.dirname(ARQUIVO_HISTORICO), exist_ok=True)
+        with open(ARQUIVO_HISTORICO, "a", encoding="utf-8") as f:
+            f.write(linha + "\n")
+    except OSError as e:
+        log(f"  Não consegui anotar no histórico do relatório ({e}).")
 
 
 def resumo(erro):
@@ -1349,6 +1526,7 @@ def cadastrar(cliente):
         avisos.append(f"Tirado da inicial, confira: {'; '.join(da_inicial)}.")
     if por_regra:
         avisos.append(f"Identificado por regra (não está escrito na inicial), confira: {'; '.join(por_regra)}.")
+    pasta_nome = os.path.basename(cliente["pasta"])
     id_rascunho = continuar_rascunho(cliente["pasta"])
     continuando = bool(id_rascunho)  # rascunho de antes: toda etapa confere o que já existe (documentos não sobem 2x)
     recarregar = False
@@ -1364,6 +1542,8 @@ def cadastrar(cliente):
                     recuperar(id_rascunho)
                 etapa(navegador(), cliente, recarregar or continuando)
                 recarregar = False
+                if falhas:  # falhou, refez e passou: engasgo que o robô resolveu sozinho
+                    anotar("sozinho", cliente=pasta_nome, etapa=nome, problema=problema, vezes=falhas)
                 break
             except Problema as e:
                 problema = str(e)
@@ -1378,10 +1558,13 @@ def cadastrar(cliente):
                     log(f"  Falhou ({problema}). Tentando de novo ({falhas}/{TENTATIVAS_AUTOMATICAS})...")
                     continue
             log(f"  PAUSADO: {problema}")
-            resposta = pedir_ajuda(n, nome, problema, guardar_tela(os.path.basename(cliente["pasta"]), n))
+            foto = guardar_tela(pasta_nome, n)
+            resposta = pedir_ajuda(n, nome, problema, foto)
+            anotar("pausa", cliente=pasta_nome, etapa=nome, problema=problema, foto=os.path.basename(foto or ""),
+                   resposta="parar" if parar else resposta)
             recarregar = True
             if resposta == "pular":
-                sys.exit(problema)
+                raise Pulado(problema)
             if resposta == "continuar":
                 avisos.append(f"Etapa {n} ({nome}) feita à mão: confira.")
                 break

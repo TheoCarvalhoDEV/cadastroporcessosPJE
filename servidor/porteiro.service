@@ -1,0 +1,16 @@
+# Login e repasse para o robô de cada escritório (o Caddy fica na frente com o HTTPS)
+[Unit]
+Description=Porteiro do robô de cadastro no PJe
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=robo
+EnvironmentFile=/srv/robo/porteiro.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/srv/robo/venv/bin/python /srv/robo/codigo/servidor/porteiro.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
