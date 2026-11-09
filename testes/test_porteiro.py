@@ -104,6 +104,28 @@ def test_criar_senha_pelo_link_do_email():
             assert r.status_code == 400 and trecho in r.get_json()["erro"], (erro, r.get_json())
 
 
+def test_email_de_criar_senha_vai_com_a_conta_da_maquina():
+    """Pedido sem a conta da máquina: o Firebase manda o link com 'apiKey=' vazio e a página dele dá 'The selected
+    page mode is invalid' (visto em 2026-11-09). Com a conta da máquina, o link sai com a chave."""
+    pedidos = []
+
+    class Resposta:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def read(self, *a): return b"{}"
+
+    def abrir(pedido, timeout=None):
+        pedidos.append(pedido)
+        return Resposta()
+    with mock.patch.object(porteiro, "token_da_maquina", lambda: "TOKEN"), \
+         mock.patch.object(porteiro.urllib.request, "urlopen", abrir):
+        porteiro.pedir_nova_senha("a@x.com")
+        porteiro.entrar_no_firebase("a@x.com", "s")
+    assert pedidos[0].get_header("Authorization") == "Bearer TOKEN" and "sendOobCode" in pedidos[0].full_url
+    assert pedidos[1].get_header("Authorization") is None  # o login da pessoa não usa a conta da máquina
+
+
 if __name__ == "__main__":
     testes = [f for n, f in sorted(globals().items()) if n.startswith("test_")]
     for t in testes:

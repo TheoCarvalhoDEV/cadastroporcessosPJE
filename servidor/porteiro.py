@@ -49,10 +49,26 @@ def escritorio_do_email(email):
     return None
 
 
-def firebase(acao, corpo):
-    """Chama a API REST do Firebase Authentication. Devolve (status, resposta)."""
+def token_da_maquina():
+    """Token da conta de serviço da máquina do Google (None fora dela)."""
+    try:
+        pedido = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/"
+                                        "default/token", headers={"Metadata-Flavor": "Google"})
+        with urllib.request.urlopen(pedido, timeout=3) as r:
+            return json.load(r)["access_token"]
+    except Exception:
+        return None
+
+
+def firebase(acao, corpo, como_maquina=False):
+    """Chama a API REST do Firebase Authentication. Devolve (status, resposta).
+    como_maquina: vai também com a conta da máquina (e-mail de criar senha: sem ela, o link sai sem a chave de API
+    e a página do Firebase dá 'The selected page mode is invalid')."""
+    cabecalhos = {"Content-Type": "application/json"}
+    if como_maquina and (token := token_da_maquina()):
+        cabecalhos["Authorization"] = "Bearer " + token
     pedido = urllib.request.Request(f"https://identitytoolkit.googleapis.com/v1/accounts:{acao}?key={API_KEY}",
-                                    data=json.dumps(corpo).encode("utf-8"), headers={"Content-Type": "application/json"})
+                                    data=json.dumps(corpo).encode("utf-8"), headers=cabecalhos)
     try:
         with urllib.request.urlopen(pedido, timeout=20) as r:
             return r.status, json.load(r)
@@ -74,7 +90,7 @@ def entrar_no_firebase(email, senha):
 def pedir_nova_senha(email):
     """O Firebase manda o e-mail de criar senha nova. Não diz se o e-mail existe."""
     try:
-        firebase("sendOobCode", {"requestType": "PASSWORD_RESET", "email": email})
+        firebase("sendOobCode", {"requestType": "PASSWORD_RESET", "email": email}, como_maquina=True)
     except Exception:
         pass
 
