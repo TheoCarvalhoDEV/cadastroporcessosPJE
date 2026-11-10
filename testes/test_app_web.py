@@ -50,6 +50,9 @@ def test_configuracao_e_correcao():
             assert r.status_code == 200, r.get_json()
             with open(config, encoding="utf-8") as f:
                 assert json.load(f) == {"cpf": "11144477735", "senha": "segredo", "totp_key": "ABC", "headless": False}
+            assert cfg["assistente_feito"] is False  # escritório que nunca passou pelo primeiro acesso
+            assert web.post("/api/escritorio", json={**corpo, "assistente_feito": True, "pje": {}}).status_code == 200
+            assert web.get("/api/escritorio").get_json()["assistente_feito"] is True
             assert robo.PREFIXO_ANEXO == "Anexo" and app_web.escritorio["nome"] == "Escritório Teste"
             assert robo.DICIONARIO[0]["assunto"] == "10433 - Dano Moral" and robo.PADRAO == {"jurisdição": "CUIABÁ CÍVEL"}
 
@@ -149,6 +152,30 @@ def test_link_do_autenticador():
         web.post("/api/parar")  # Cancelar solta o robô que espera o link
         assert app_web.links.get_nowait() == ""
     app_web.robo.parar = False
+
+
+def test_testar_login_do_primeiro_acesso():
+    """'Testar e continuar' do assistente: o robô entra no PJe uma vez; a página lê o resultado em /api/estado."""
+    import time as t
+    web = app_web.app.test_client()
+    tmp = tempfile.mkdtemp()
+    with mock.patch.object(robo, "ARQUIVO_CONFIG", os.path.join(tmp, "config.json")):
+        assert web.post("/api/testar-login").status_code == 400  # sem CPF e senha
+        robo.gravar_config({"cpf": "11144477735", "senha": "s"})
+        for resultado, esperado in ((None, {"ok": True}), (SystemExit("O PJe recusou a senha."), {"ok": False, "msg": "O PJe recusou a senha."})):
+            def abrir():
+                if resultado:
+                    raise resultado
+            with mock.patch.object(app_web, "abrir_pje", abrir), mock.patch.object(app_web, "anotar_parada", lambda m: None):
+                assert web.post("/api/testar-login").status_code == 200
+                assert web.get("/api/estado").get_json()["teste_login"] in ({"rodando": True}, esperado)
+                for _ in range(50):
+                    if not app_web.estado["tarefa"]:
+                        break
+                    t.sleep(0.05)
+                assert web.get("/api/estado").get_json()["teste_login"] == esperado
+        with mock.patch.dict(app_web.estado, {"tarefa": "cadastrar"}):
+            assert web.post("/api/testar-login").status_code == 409
 
 
 def test_erros_para_o_administrador():

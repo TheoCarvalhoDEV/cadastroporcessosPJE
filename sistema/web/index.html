@@ -154,6 +154,91 @@
   body.entrando { padding-left: 0; }
   body.entrando .rail, body.entrando .topo { display: none; }
   .entrar { min-height: 90vh; display: grid; place-items: center; padding: 16px; }
+  /* ---------- primeiro acesso: assistente de uma pergunta por tela (sem o menu e o topo) ---------- */
+  body.assistindo { padding-left: 0; }
+  body.assistindo .rail, body.assistindo .topo, body.assistindo .faixa-admin { display: none; }
+  .assistente { min-height: 100vh; display: flex; flex-direction: column; }
+  .ass-topo { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap;
+    padding: 18px clamp(16px, 4vw, 48px); background: var(--superficie); border-bottom: 1px solid var(--borda); }
+  .ass-marca { display: flex; align-items: center; gap: 12px; font: 800 18px var(--titulo); }
+  .ass-sigla { width: 40px; height: 40px; border-radius: 12px; background: var(--cor); color: var(--sobre-cor); display: grid; place-items: center; font: 800 14px var(--titulo); flex: none; }
+  .ass-topo .dica { font-size: 13px; }
+  .ass-topo .link { background: none; border: 0; padding: 0; color: var(--cor-texto); font-weight: 600; cursor: pointer; font-size: 13px; }
+  .ass-corpo { flex: 1; display: flex; justify-content: center; padding: 40px 16px 56px; }
+  .ass-coluna { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 24px; }
+  .ass-passos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .ass-passos li { display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 600; color: var(--tinta-3); }
+  .ass-passos li::before { content: ""; height: 6px; border-radius: 999px; background: var(--borda); }
+  .ass-passos li.feito::before, .ass-passos li.atual::before { background: var(--cor); }
+  .ass-passos li.atual { color: var(--cor-texto); font-weight: 700; }
+  .ass-passos li.feito { color: var(--ok); }
+  .ass-cartao { background: var(--superficie); border: 1px solid var(--borda); border-radius: 20px; padding: clamp(24px, 4vw, 40px);
+    display: flex; flex-direction: column; gap: 24px; }
+  .ass-cartao h1 { margin: 0; font: 800 28px var(--titulo); letter-spacing: -.01em; }
+  .ass-cartao h2 { margin: 0; font: 800 18px var(--titulo); }
+  .ass-cartao .explica { margin: 8px 0 0; font-size: 15px; line-height: 1.55; color: var(--tinta-2); }
+  .ass-cartao .campo input:not([type=color]) { height: 52px; font-size: 16px; }
+  .ass-cartao hr { border: 0; border-top: 1px solid var(--borda); margin: 0; }
+  .ass-rodape { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .ass-rodape .botao { height: 52px; padding: 0 24px; font-size: 16px; }
+  .ass-rodape .botao.principal { margin-left: auto; }
+  .escolhas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .escolha-cartao { text-align: left; padding: 20px; border-radius: 16px; border: 1px solid var(--borda-forte); background: var(--superficie);
+    cursor: pointer; display: flex; flex-direction: column; gap: 8px; color: var(--tinta); }
+  .escolha-cartao[aria-pressed="true"] { border: 2px solid var(--cor); background: var(--cor-suave); padding: 19px; }
+  .escolha-cartao strong { font: 800 16px var(--titulo); }
+  .escolha-cartao .d { font-size: 13px; line-height: 1.5; color: var(--tinta-2); }
+  .painel-ass { display: flex; flex-direction: column; gap: 16px; padding: 20px; border-radius: 16px; background: var(--fundo); border: 1px solid var(--borda); }
+  .passos-qr { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .passos-qr li { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; font-size: 13px; line-height: 1.5; }
+  .passos-qr b.n { width: 28px; height: 28px; border-radius: 50%; background: var(--cor); color: var(--sobre-cor); display: grid; place-items: center; font-size: 13px; }
+  .painel-ass details summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--cor-texto); }
+  .previa-ass { display: flex; align-items: center; gap: 12px; padding: 16px; border: 1px solid var(--borda); border-radius: 14px; background: var(--fundo); flex-wrap: wrap; }
+  .previa-ass .nomes { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+  .previa-ass .nomes strong { font: 800 16px var(--titulo); }
+  .previa-ass .falso-botao { height: 36px; padding: 0 14px; border-radius: 10px; background: var(--cor); color: var(--sobre-cor); font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; }
+  .pasta-exemplo { border: 1px solid var(--borda); border-radius: 16px; overflow: hidden; }
+  .pasta-exemplo .cab { display: flex; align-items: center; gap: 10px; padding: 14px 18px; background: var(--fundo); border-bottom: 1px solid var(--borda); font-weight: 700; font-size: 14px; }
+  .pasta-exemplo ul { list-style: none; margin: 0; padding: 8px 0; }
+  .pasta-exemplo li { display: flex; align-items: center; gap: 12px; padding: 10px 18px; flex-wrap: wrap; }
+  .pasta-exemplo .arq { font-family: var(--mono); font-size: 13px; flex: 1; min-width: 200px; overflow-wrap: anywhere; }
+  .pasta-exemplo mark { background: var(--alerta-fundo); color: var(--alerta); border: 1px solid var(--alerta-borda); padding: 0 3px; border-radius: 4px; }
+  .ass-pronto { align-items: center; text-align: center; }
+  .selo-ok { width: 72px; height: 72px; border-radius: 50%; background: var(--ok-fundo); color: var(--ok); display: grid; place-items: center; }
+  .resumo-ass { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+  .resumo-ass li { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--borda); border-radius: 14px; font-size: 14px; }
+  .resumo-ass li .ok { color: var(--ok); } .resumo-ass li .alerta { color: var(--alerta); }
+  .testando { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--tinta-2); }
+  @media (max-width: 700px) { .escolhas, .passos-qr, .ass-passos { grid-template-columns: minmax(0, 1fr); } }
+  /* ---------- ajustes: Básico (3 cartões) e Avançado (só o administrador) ---------- */
+  .config.simples { grid-template-columns: minmax(0, 1040px); }
+  .config.simples .config-resumo { display: none; }
+  .config.simples .abas { border-bottom: 0; gap: 6px; }
+  .config.simples .abas button { height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--borda); background: var(--superficie);
+    font-size: 13px; font-weight: 600; color: var(--tinta-2); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .config.simples .abas button[aria-current="true"] { background: var(--cor-suave); border-color: var(--cor-media); color: var(--cor-texto); font-weight: 700; }
+  .config.simples .abas .so-adm { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--cor); color: var(--sobre-cor); }
+  .cartoes-cfg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .cartao-cfg { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+  .cartao-cfg .cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .cartao-cfg h2 { font: 800 17px var(--titulo); }
+  .cartao-cfg ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--tinta-2); }
+  .cartao-cfg p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--tinta-2); }
+  .cartao-cfg .rodape { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+  .cartao-cfg .rodape .botao { width: 100%; justify-content: center; }
+  .ajuda-cfg { display: flex; align-items: center; gap: 16px; padding: 20px 24px; border-radius: 18px; background: var(--cor-suave); border: 1px solid var(--cor-media); flex-wrap: wrap; }
+  .ajuda-cfg strong { display: block; font-size: 15px; }
+  .ajuda-cfg span { font-size: 13px; color: var(--tinta-2); }
+  details.avancado { padding: 0 24px; }
+  details.avancado > summary { display: flex; align-items: center; gap: 12px; padding: 20px 0; cursor: pointer; list-style: none; }
+  details.avancado > summary::-webkit-details-marker { display: none; }
+  details.avancado > summary .textos { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  details.avancado > summary strong { font: 800 16px var(--titulo); }
+  details.avancado > summary .sub { font-size: 13px; color: var(--tinta-3); }
+  details.avancado > summary .seta { color: var(--tinta-3); transform: rotate(180deg); transition: transform .15s; }
+  details.avancado[open] > summary .seta { transform: rotate(270deg); }
+  details.avancado .conteudo { padding: 0 0 24px; display: flex; flex-direction: column; gap: 16px; }
+  @media (max-width: 1000px) { .cartoes-cfg { grid-template-columns: minmax(0, 1fr); } }
   /* ---------- administrador do Autus: todos os escritórios ---------- */
   .admin { padding: 24px clamp(16px, 3vw, 32px) 48px; display: flex; flex-direction: column; gap: 16px; }
   .admin .rel-topo .botao { margin-left: auto; }
@@ -569,6 +654,8 @@
 
 <main id="tela-entrar" class="entrar" hidden></main>
 
+<main id="tela-assistente" class="assistente" hidden></main>
+
 <main id="tela-admin" class="admin" hidden>
   <div class="rel-topo">
     <h1 id="admin-titulo">Escritórios</h1>
@@ -794,11 +881,12 @@ $("#fechar-relatorio").addEventListener("click", () => mostrarTela("cadastro"));
 $("#status").addEventListener("click", () => { if (est.pausa) mostrarTela("cadastro"); });
 let tempoFiltro = 0;  // espera a pessoa parar de digitar antes de redesenhar a lista
 $("#filtro").addEventListener("input", ev => { const v = ev.target.value; clearTimeout(tempoFiltro); tempoFiltro = setTimeout(() => { filtro = v; desenharLista(); }, 150); });
-const TELAS = ["cadastro", "config", "relatorio", "entrar", "admin"];
+const TELAS = ["cadastro", "config", "relatorio", "entrar", "admin", "assistente"];
 function mostrarTela(qual) {
   const trocou = $("#tela-" + qual).hidden;
   for (const t of TELAS) $("#tela-" + t).hidden = t !== qual;
   document.body.classList.toggle("entrando", qual === "entrar");
+  document.body.classList.toggle("assistindo", qual === "assistente");
   if (trocou && qual === "entrar") desenharEntrar();
   [["cadastro", "#ir-cadastro"], ["relatorio", "#abrir-relatorio"], ["config", "#abrir-config"], ["admin", "#abrir-admin"]]
     .forEach(([t, id]) => $(id).setAttribute("aria-current", String(t === qual)));
@@ -1236,68 +1324,282 @@ async function atualizarEstado() {
   $("#status").className = r.pausa ? "esperando" : r.tarefa ? "trabalhando" : "";
   $("#status-texto").textContent = r.pausa ? "Esperando você" : r.tarefa === "mapear" ? "Lendo as opções do PJe"
     : r.tarefa === "cadastrar" ? "Cadastrando agora" : r.autenticador && r.autenticador.etapa === "link" ? "Esperando o link do e-mail"
-    : r.tarefa === "autenticador" ? "Configurando o código" : "Robô parado";
+    : r.tarefa === "autenticador" ? "Configurando o código" : r.tarefa === "testar" ? "Testando o login no PJe" : "Robô parado";
   desenharAndamento();
-  if (marcaAutenticador() !== autenticadorDesenhado) desenharAutenticador();
+  if (marcaAutenticador() !== autenticadorDesenhado) assist && assist.passo === 2 ? desenharAssistente() : desenharAutenticador();
+  verificarTesteLogin();
   if (tarefaAntes !== r.tarefa || atualAntes !== r.atual || resultadosAntes !== Object.keys(r.resultados).length || r.pausa
       || etapaAntes !== etapaAtual().atualN) desenharLista();
   if (tarefaAntes && !r.tarefa) tarefaAntes === "mapear" ? carregarMapa() : carregarClientes();
 }
 
-// ---------- configurações: todas as seções numa página ----------
-let rotulos = [], partes = [], dicionario = [], abaConfig = "acesso", haMudancas = false;
-const ABAS_CONFIG = [
-  ["acesso", "Escritório e acesso", ["escritorio", "login"]],
-  ["pastas", "Pastas e documentos", ["documentos"]],
-  ["regras", "Regras do robô", ["ordem", "dicionario", "padrao", "partes"]],
-  ["pje", "Opções do PJe", ["pje"]]];
-const DICAS_SERVIDOR = {
-  acesso: ["Seus dados ficam protegidos", "A senha e a chave do autenticador ficam guardadas no cofre de senhas do servidor, só para o seu escritório, e não aparecem de novo depois de salvas."],
-  pastas: ["Dica de ritmo", "No servidor ninguém acompanha o Chrome do robô: com 0 segundos os cadastros ficam bem mais rápidos."]};
-const DICAS_ABA = {
-  acesso: ["Seus dados ficam aqui", "A senha e a chave do autenticador ficam só neste computador e não aparecem de novo depois de salvas."],
-  pastas: ["Dica de ritmo", "Para acompanhar o robô no Chrome, use de 3 a 5 segundos. Quando já confiar nele, baixe para 0 e os cadastros ficam bem mais rápidos."],
-  regras: ["Como o dicionário decide", "Vale a primeira regra, de cima para baixo, em que todas as palavras aparecem na inicial. Uma palavra só basta quando ela aparece apenas nesse tipo de ação."],
-  pje: ["Para que serve esta aba", "Aqui você só consulta o que o PJe aceita: escolha uma matéria e veja jurisdições, competências e classes. Releia quando o tribunal mudar a tela de Novo processo."]};
-// situação de cada aba: [pronta?, texto curto]
-function situacaoAba(chave) {
-  const p = (cfg && cfg.pje) || {};
-  if (chave === "acesso") return p.cpf && p.tem_senha && p.tem_totp ? [true, "Login e autenticador guardados"]
-    : !(p.cpf && p.tem_senha) ? [false, "Falta o CPF ou a senha do PJe"] : [false, "Falta o código de 2 fatores"];
-  if (chave === "pastas") return cfg && cfg.pasta_clientes ? [true, `${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"} na pasta`]
-    : [false, "Escolha a pasta dos clientes"];
-  if (chave === "regras") return [true, `${dicionario.length} no dicionário, ${partes.length} ${partes.length === 1 ? "réu conhecido" : "réus conhecidos"}`];
-  return materias().length ? [true, `Lidas em ${mapa.atualizado_em}`] : [false, "Ainda não lidas do PJe"];
-}
+// ---------- ajustes: Básico (3 cartões, para o escritório) e Avançado (regras do robô, para o administrador) ----------
+// O escritório só vê o Básico; o que muda lá abre o mesmo passo do assistente. O Avançado é do administrador do
+// Autus (no servidor) ou de quem instala (no modo local): regras de como o robô identifica cada processo.
+let rotulos = [], partes = [], dicionario = [], abaConfig = "basico", haMudancas = false, embutido = false;
+const veAvancado = () => !cfg.servidor || souAdmin;
+const pilulaPronta = (pronta, texto) => h("span", { class: "pilula " + (pronta ? "ok" : "alerta") }, h("span", { class: "ponto" }), texto);
 function desenharConfig() {
-  const construir = { escritorio: cfgEscritorio, login: cfgLogin, documentos: cfgDocumentos, ordem: cfgOrdem, padrao: cfgPadrao,
-    dicionario: cfgDicionario, partes: cfgPartes, pje: cfgPje };
-  const secoes = (ABAS_CONFIG.find(a => a[0] === abaConfig) || ABAS_CONFIG[0])[2];
+  $("#tela-config").classList.add("simples");
+  if (!veAvancado()) abaConfig = "basico";
+  $(".config-topo .dica").textContent = abaConfig === "avancado"
+    ? "Regras de como o robô identifica cada processo. " + (cfg.servidor ? "O escritório não vê esta parte." : "Mexa só se souber o que está fazendo.")
+    : "Só três coisas. Clique em Alterar para mudar qualquer uma.";
+  encher($("#config-nav"), veAvancado() ? [["basico", "Básico"], ["avancado", "Avançado"]].map(([chave, nome]) =>
+    h("button", { type: "button", "aria-current": chave === abaConfig, onclick: () => { abaConfig = chave; desenharConfig(); window.scrollTo(0, 0); } },
+      nome, chave === "avancado" && cfg.servidor ? h("span", { class: "so-adm" }, "só adm") : null)) : []);
   $("#config-conteudo").dataset.aba = abaConfig;
-  encher($("#config-conteudo"), secoes.map(chave => construir[chave]()));
-  encher($("#config-nav"), ABAS_CONFIG.map(([chave, nome]) => {
-    const [pronta] = situacaoAba(chave);
-    return h("button", { type: "button", class: "aba", "aria-current": chave === abaConfig,
-      onclick: () => { abaConfig = chave; desenharConfig(); window.scrollTo(0, 0); } }, nome,
-      chave === "regras" ? h("span", { class: "conta" }, dicionario.length + partes.length)
-        : h("i", { class: "ponto-aba" + (pronta ? "" : " alerta"), title: pronta ? "Pronto" : "Falta algo" }));
-  }));
-  desenharResumo();
+  encher($("#config-conteudo"), abaConfig === "avancado" ? cfgAvancado() : cfgBasico());
   desenharAutenticador();
 }
-function desenharResumo() {
-  const caixa = $("#config-resumo");
-  if (!caixa || !cfg) return;
-  const [titulo, texto] = cfg.servidor && DICAS_SERVIDOR[abaConfig] || DICAS_ABA[abaConfig];
-  encher(caixa, h("section", { class: "cartao resumo" }, h("h2", {}, "Está tudo pronto?"),
-      ABAS_CONFIG.map(([chave, nome]) => {
-        const [pronta, sub] = situacaoAba(chave);
-        return h("button", { type: "button", onclick: () => { abaConfig = chave; desenharConfig(); window.scrollTo(0, 0); } },
-          h("span", { class: pronta ? "ok" : "alerta" }, icone(pronta ? "certo" : "alerta", 18)),
-          h("span", {}, h("strong", {}, nome), h("small", {}, sub)));
-      })),
-    h("section", { class: "cartao dica-aba" }, h("strong", {}, titulo), h("p", {}, texto)));
+
+function cfgBasico() {
+  const p = cfg.pje, acessoPronto = p.cpf && p.tem_senha && p.tem_totp;
+  const qr = h("div", {});
+  const cartao = (titulo, pronta, textoPronta, corpo, passo, extra) => h("section", { class: "cartao cartao-cfg" },
+    h("div", { class: "cab" }, h("h2", {}, titulo), pilulaPronta(pronta, pronta ? textoPronta : "Falta configurar")), corpo,
+    h("div", { class: "rodape" }, extra, h("button", { class: "botao", type: "button", onclick: () => abrirAssistente(passo, "alterar") }, "Alterar")));
+  return [h("div", { class: "cartoes-cfg" },
+      cartao("Escritório", !!cfg.nome, "Pronto", h("div", { class: "previa-ass", style: "background:none;border:0;padding:0" },
+        h("span", { class: "ass-sigla" }, siglaDe(cfg.nome)), h("strong", {}, cfg.nome || "Sem nome")), 1),
+      cartao("Acesso ao PJe", acessoPronto, "Guardado", h("ul", {},
+          h("li", {}, p.cpf ? `CPF ${formatarCpf(p.cpf)}` : "CPF não preenchido"),
+          h("li", {}, p.tem_senha ? "Senha guardada" : "Senha não preenchida"),
+          h("li", {}, p.tem_totp ? "Código de 6 números: o robô gera" : "Código de 6 números: falta configurar")), 2,
+        p.tem_totp ? [h("button", { class: "botao fantasma", type: "button", onclick: async () => {
+            try { const r = await api("/api/autenticador/qr"); encher(qr, blocoQR(r.qr, r.chave)); } catch (e) { avisar(e.message); } } },
+          "Mostrar o QR para outro celular"), qr] : null),
+      cartao("Documentos", !!cfg.prefixo_anexo, "Pronto", h("p", {}, "Os anexos começam com ", h("strong", {}, cfg.prefixo_anexo || "—"),
+        `, por exemplo "${cfg.prefixo_anexo || "DOC"} 01] RG.pdf".`), 3)),
+    h("section", { class: "ajuda-cfg" }, icone("alerta", 24),
+      h("div", { style: "flex:1;min-width:240px" }, h("strong", {}, "O robô errou um assunto, uma competência ou um réu?"),
+        h("span", {}, "Corrija na ficha do cliente e avise o suporte do Autus: a gente ensina o robô para os próximos.")))];
 }
+function cfgAvancado() {
+  const bloco = (titulo, sub, resumo, construir) => {
+    const conteudo = h("div", { class: "conteudo" });
+    return h("details", { class: "cartao avancado", ontoggle: ev => {
+        if (ev.target.open && !conteudo.childElementCount) { embutido = true; try { encher(conteudo, construir()); } finally { embutido = false; } } } },
+      h("summary", {}, h("span", { class: "seta" }, icone("voltar", 16)),
+        h("span", { class: "textos" }, h("strong", {}, titulo), h("span", { class: "sub" }, sub)),
+        h("span", { class: "tag" }, resumo)), conteudo);
+  };
+  return [
+    bloco("Assunto pelo texto da inicial", "Quando a inicial tem estas palavras, o robô escolhe este assunto e esta matéria no PJe",
+      vezes(dicionario.length, "regra", "regras"), cfgDicionario),
+    bloco("Quando a inicial não diz", "Matéria, jurisdição, competência, classe e raça/cor que o robô usa como padrão",
+      Object.values(cfg.padrao).some(Boolean) ? "Com padrão" : "Tudo pela inicial", cfgPadrao),
+    bloco("Réus que a inicial cita sem CNPJ", "Ex.: Estado de Mato Grosso. O robô procura a parte no PJe por este CNPJ",
+      vezes(partes.length, "réu", "réus"), cfgPartes),
+    bloco("Ficha do cliente (.docx)", "Quando o modelo do escritório chama um campo por outro nome, e quem vale mais quando as fontes discordam",
+      rotulos.length ? vezes(rotulos.length, "rótulo", "rótulos") : "Padrão", () => [cfgRotulos(), cfgOrdem()]),
+    bloco("Documentos no PJe", "Tipo de documento do 1º anexo e dos demais" + (cfg.servidor ? "" : ", e a pausa entre as ações do robô"),
+      `${cfg.anexo_primeiro || "—"} / ${cfg.anexo_demais || "—"}`, cfgTiposDocumento),
+    bloco("Opções do PJe", "O que o PJe aceita em cada campo. Releia quando o tribunal mudar a tela de Novo processo",
+      materias().length ? `Lidas em ${mapa.atualizado_em}` : "Ainda não lidas", cfgPje)];
+}
+// ---------- primeiro acesso: assistente de 3 passos (e o "Alterar" dos cartões do Básico) ----------
+// modo "primeiro": Continuar/Voltar até o "Tudo pronto"; modo "alterar": um passo só, com Salvar/Cancelar.
+let assist = null;
+const precisaAssistente = () => !cfg.assistente_feito && !(cfg.pje.cpf && cfg.pje.tem_senha && cfg.pje.tem_totp);
+function abrirAssistente(passo = 1, modo = "primeiro") {
+  assist = { passo, modo, codigo: cfg.pje.tem_totp ? "celular" : null, msg: "", testando: false, falhou: false };
+  pjeDigitado = { cpf: cfg.pje.cpf, senha: "", totp_key: "" };
+  haMudancas = false;
+  mostrarTela("assistente");
+  desenharAssistente();
+}
+function fecharAssistente(para = "config") {
+  assist = null; haMudancas = false;
+  mostrarTela(para);
+  if (para === "config") desenharConfig();
+}
+function desenharAssistente() {
+  const a = assist, alterar = a.modo === "alterar";
+  const passo = [assEscritorio, assAcesso, assDocumentos, assPronto][a.passo - 1]();
+  const passos = !alterar && a.passo <= 3 ? h("ol", { class: "ass-passos", "aria-label": "Passos" },
+    ["Seu escritório", "Acesso ao PJe", "Seus documentos"].map((t, i) =>
+      h("li", { class: i + 1 < a.passo ? "feito" : i + 1 === a.passo ? "atual" : "", "aria-current": i + 1 === a.passo ? "step" : false },
+        `${i + 1}. ${t}${i + 1 < a.passo ? " ✓" : ""}`))) : null;
+  encher($("#tela-assistente"),
+    h("header", { class: "ass-topo" }, h("div", { class: "ass-marca" }, h("span", { class: "ass-sigla" }, siglaDe(cfg.nome)), cfg.nome || "Autus"),
+      alterar ? h("button", { class: "link", type: "button", onclick: () => fecharAssistente() }, "Voltar aos ajustes")
+        : a.passo < 4 ? h("span", { class: "dica" }, "Leva uns 5 minutos. ", h("button", { class: "link", type: "button",
+            onclick: () => fecharAssistente("cadastro") }, "Configurar depois")) : null),
+    h("div", { class: "ass-corpo" }, h("div", { class: "ass-coluna" }, passos, passo.cartao,
+      a.msg ? h("div", { class: "aviso erro", role: "alert" }, icone("erro"), h("p", {}, a.msg)) : null, passo.rodape)));
+  if ($("#autenticador")) desenharAutenticador();
+}
+// rodapé: Voltar/Continuar (primeiro acesso) ou Cancelar/Salvar (alterar um cartão)
+function rodapeAss(avancar, { textoAvancar = "Continuar", nota } = {}) {
+  const a = assist, alterar = a.modo === "alterar";
+  const ir = h("button", { class: "botao principal", type: "button", disabled: a.testando, onclick: async () => {
+      a.msg = ""; ir.disabled = true;
+      try { await avancar(); } catch (e) { a.msg = e.message; desenharAssistente(); }
+    } }, alterar ? "Salvar" : textoAvancar, alterar ? null : icone("voltar", 18));
+  ir.lastChild && ir.lastChild.style && (ir.lastChild.style.transform = "rotate(180deg)");
+  return h("div", {}, h("div", { class: "ass-rodape" },
+      alterar ? h("button", { class: "botao", type: "button", onclick: () => fecharAssistente() }, "Cancelar")
+        : a.passo > 1 ? h("button", { class: "botao", type: "button", disabled: a.testando, onclick: () => { a.passo--; a.msg = ""; desenharAssistente(); } }, "Voltar") : null,
+      ir),
+    nota ? h("p", { class: "dica", style: "text-align:right;margin-top:8px" }, nota) : null);
+}
+// a pessoa começou a corrigir: o aviso de erro do assistente sai (sem redesenhar, para não perder o foco do campo)
+function limparAvisoAss() {
+  if (!assist || !assist.msg) return;
+  assist.msg = "";
+  const aviso = $("#tela-assistente .ass-coluna > .aviso.erro");
+  if (aviso) aviso.remove();
+}
+function proximoPasso() {
+  if (assist.modo === "alterar") return fecharAssistente();
+  assist.passo++; assist.msg = ""; assist.falhou = false;
+  desenharAssistente(); window.scrollTo(0, 0);
+}
+function assEscritorio() {
+  const nome = h("strong", {}, cfg.nome || "Nome do escritório"), sigla = h("span", { class: "ass-sigla" }, siglaDe(cfg.nome));
+  const campoNome = ligado("nome", { placeholder: "ex.: Silva & Souza Advogados", maxlength: 80 }, v => v, () => {
+    nome.textContent = cfg.nome || "Nome do escritório"; sigla.textContent = siglaDe(cfg.nome); aplicarIdentidade(); limparAvisoAss(); });
+  setTimeout(() => campoNome.focus());
+  return {
+    cartao: h("section", { class: "ass-cartao" },
+      h("div", {}, h("h1", {}, "Como se chama o seu escritório?"), h("p", { class: "explica" }, "É o nome que aparece no topo do sistema para toda a sua equipe.")),
+      campo("Nome do escritório", campoNome),
+      campo("Cor do escritório", seletorDeCor()),
+      h("div", {}, h("span", { class: "dica" }, "Assim fica no sistema"),
+        h("div", { class: "previa-ass", style: "margin-top:8px" }, sigla,
+          h("div", { class: "nomes" }, nome, h("span", { class: "dica" }, "Cadastro de processos no PJe do TJMT")),
+          h("span", { class: "falso-botao" }, "Cadastrar")))),
+    rodape: rodapeAss(async () => {
+      if (!(cfg.nome || "").trim()) throw new Error("Escreva o nome do escritório.");
+      await salvarConfig(); proximoPasso();
+    })};
+}
+function assAcesso() {
+  const a = assist, p = cfg.pje;
+  const cpf = h("input", { class: "mono", inputmode: "numeric", autocomplete: "off", value: pjeDigitado.cpf,
+    oninput: ev => { pjeDigitado.cpf = ev.target.value; mudou(); } });
+  const senha = h("input", { type: "password", autocomplete: "new-password", value: pjeDigitado.senha,
+    placeholder: p.tem_senha ? "guardada (deixe em branco para manter)" : "", oninput: ev => { pjeDigitado.senha = ev.target.value; mudou(); } });
+  const escolha_ = (valor, icon, titulo, desc) => h("button", { type: "button", class: "escolha-cartao", "aria-pressed": a.codigo === valor,
+    onclick: () => { a.codigo = valor; a.msg = ""; desenharAssistente(); } }, icone(icon, 26), h("strong", {}, titulo), h("span", { class: "d" }, desc));
+  const loginOk = () => {
+    if (pjeDigitado.cpf.replace(/\D/g, "").length !== 11) throw new Error("Escreva o CPF do advogado (11 números).");
+    if (!pjeDigitado.senha && !p.tem_senha) throw new Error("Escreva a senha do PJe.");
+  };
+  let painel = null;
+  if (a.codigo === "celular") {
+    const chave = h("input", { type: "password", autocomplete: "off", value: pjeDigitado.totp_key, placeholder: p.tem_totp ? "guardada (deixe em branco para manter)" : "",
+      oninput: ev => { pjeDigitado.totp_key = ev.target.value; mudou(); } });
+    painel = h("div", { class: "painel-ass" },
+      p.tem_totp ? h("div", { class: "aviso ok" }, icone("certo"), h("p", {}, "O robô já tem o código guardado. Só envie de novo se o celular mudou.")) : null,
+      h("strong", {}, "Passe o código do celular para o robô"),
+      h("ol", { class: "passos-qr" },
+        h("li", {}, h("b", { class: "n" }, "1"), h("span", {}, "No celular, abra o ", h("strong", {}, "Google Authenticator"), " e toque nos ", h("strong", {}, "três pontinhos"), ".")),
+        h("li", {}, h("b", { class: "n" }, "2"), h("span", {}, "Toque em ", h("strong", {}, "Transferir contas"), ", escolha a conta do ", h("strong", {}, "PJe"), " e avance.")),
+        h("li", {}, h("b", { class: "n" }, "3"), h("span", {}, "Tire um ", h("strong", {}, "print do QR"), " que aparecer e envie aqui."))),
+      leitorDeQR(chave, "Enviar o print do QR"),
+      h("details", {}, h("summary", {}, "Prefiro digitar a chave do autenticador"),
+        h("div", { style: "margin-top:12px" }, campo("Chave do autenticador", chave, "São letras e números (não os 6 números que mudam)."))));
+  } else if (a.codigo === "naosei") {
+    painel = h("div", { class: "painel-ass" },
+      p.tem_totp ? h("div", { class: "aviso ok" }, icone("certo"), h("p", {}, "Pronto: o robô já gera o código sozinho.")) : null,
+      h("strong", {}, "O robô configura o código sozinho"),
+      h("p", { class: "dica" }, "Ele entra no PJe, pede um dispositivo novo e o PJe manda um link para o e-mail do advogado. Você só copia esse link e cola aqui. "
+        + "Atenção: o código que estiver em outro celular para de valer. No fim, o robô mostra um QR para os celulares lerem de novo."),
+      est.tarefa === "autenticador" || (est.autenticador || {}).etapa ? null
+        : h("div", { class: "linha" }, h("button", { class: "botao principal", type: "button", onclick: async () => {
+            try { loginOk(); await salvarConfig(); await acaoAutenticador("/api/autenticador", {}); } catch (e) { a.msg = e.message; desenharAssistente(); }
+          } }, p.tem_totp ? "Configurar de novo" : "Salvar e configurar o código")),
+      h("div", { class: "autenticador", id: "autenticador", "data-assistente": "1" }));
+  }
+  return {
+    cartao: h("section", { class: "ass-cartao" },
+      h("div", {}, h("h1", {}, "Com qual login o robô entra no PJe?"),
+        h("p", { class: "explica" }, "Use o mesmo CPF e a mesma senha que o advogado usa para entrar no PJe do TJMT. Não precisa de certificado digital.")),
+      h("div", { class: "grade2" }, campo("CPF do advogado", cpf), campo("Senha do PJe", senha)),
+      h("hr"),
+      h("div", {}, h("h2", {}, "E o código de 6 números que o PJe pede?"),
+        h("p", { class: "explica" }, "Depois da senha, o PJe pede um código que muda a cada 30 segundos. O robô precisa gerar esse código sozinho.")),
+      h("div", { class: "escolhas" },
+        escolha_("celular", "certo", "O código já está no meu celular", "O advogado usa o Google Authenticator (ou outro app) para entrar no PJe."),
+        escolha_("naosei", "alerta", "Não sei / não tenho", "O robô configura sozinho. O advogado só copia um link que chega por e-mail.")),
+      painel),
+    rodape: a.testando
+      ? h("div", { class: "ass-rodape" }, h("span", { class: "testando" }, h("span", { class: "ponto" }), "O robô está entrando no PJe para testar. Pode levar até 1 minuto..."))
+      : rodapeAss(async () => {
+          loginOk();
+          if (!a.codigo) throw new Error("Escolha uma das opções do código de 6 números.");
+          if (a.codigo === "celular" && !pjeDigitado.totp_key && !p.tem_totp) throw new Error("Envie o print do QR (ou digite a chave) antes de continuar.");
+          if (a.codigo === "naosei" && !p.tem_totp) throw new Error("Clique em \"Salvar e configurar o código\" e siga os passos antes de continuar.");
+          if (haMudancas) await salvarConfig();
+          await api("/api/testar-login", {});
+          est.teste_login = null; a.testando = true; desenharAssistente();
+        }, { textoAvancar: "Testar e continuar", nota: a.falhou ? null : "\"Testar\" faz o robô entrar no PJe uma vez. Se algo estiver errado, ele diz o quê." }),
+    };
+}
+// chamado a cada consulta do estado: terminou o teste do login do PJe?
+function verificarTesteLogin() {
+  const a = assist, t = est.teste_login;
+  if (!a || !a.testando || est.tarefa === "testar" || !t || t.rodando) return;
+  a.testando = false;
+  if (t.ok) return proximoPasso();
+  a.falhou = true;
+  a.msg = "O robô não conseguiu entrar no PJe: " + (t.msg || "sem mensagem") + " Confira o CPF, a senha e o código e tente de novo.";
+  desenharAssistente();
+  const rod = $("#tela-assistente .ass-rodape");
+  if (rod) rod.append(h("button", { class: "botao fantasma", type: "button", onclick: proximoPasso }, "Continuar sem testar"));
+}
+function assDocumentos() {
+  const lista = h("ul", {});
+  const desenharLista = () => {
+    const pre = (cfg.prefixo_anexo || "").trim() || "DOC";
+    encher(lista,
+      h("li", {}, h("span", { class: "arq" }, "Petição inicial.pdf"), h("span", { class: "pilula info" }, "Petição inicial")),
+      h("li", {}, h("span", { class: "arq" }, h("mark", {}, `${pre} 01]`), " Documentos pessoais.pdf"), h("span", { class: "pilula ok" }, "1º anexo")),
+      h("li", {}, h("span", { class: "arq" }, h("mark", {}, `${pre} 02]`), " Comprovante de residência.pdf"), h("span", { class: "pilula ok" }, "2º anexo")),
+      h("li", {}, h("span", { class: "arq" }, "Cadastro.docx ", h("span", { class: "dica" }, "(opcional)")), h("span", { class: "tag" }, "Ficha do cliente")));
+  };
+  desenharLista();
+  return {
+    cartao: h("section", { class: "ass-cartao" },
+      h("div", {}, h("h1", {}, "Como fica a pasta de cada cliente"),
+        h("p", { class: "explica" }, "Cada cliente é uma pasta. O robô descobre sozinho o que é a petição e o que é anexo pelo começo do nome do arquivo.")),
+      h("div", { class: "pasta-exemplo" }, h("div", { class: "cab" }, icone("pasta", 20), "Maria da Silva [Ação de Cobrança]"), lista),
+      campo("No seu escritório, os anexos começam com", ligado("prefixo_anexo", { class: "mono", style: "max-width:240px" }, v => v, desenharLista),
+        "Ex.: se vocês escrevem \"Anexo 01] RG.pdf\", troque por Anexo."),
+      cfg.servidor ? null : campo("Pasta dos clientes neste computador", ligado("pasta_clientes", { class: "mono" }),
+        "Cada cliente é uma pasta aqui dentro. Os já cadastrados vão para a subpasta Concluído."),
+      h("div", { class: "aviso" }, icone("alerta"), h("p", {}, "O robô deixa o processo pronto como ", h("strong", { style: "display:inline" }, "rascunho"),
+        " no PJe. Ele nunca assina nem protocola: quem faz isso é o advogado."))),
+    rodape: rodapeAss(async () => {
+      if (!(cfg.prefixo_anexo || "").trim()) throw new Error("Escreva como começa o nome dos anexos (ex.: DOC).");
+      if (assist.modo === "primeiro") cfg.assistente_feito = true;
+      await salvarConfig(); proximoPasso();
+    }, { textoAvancar: "Concluir" })};
+}
+function assPronto() {
+  const p = cfg.pje, item = (pronto, ...texto) => h("li", {}, h("span", { class: pronto ? "ok" : "alerta" }, icone(pronto ? "certo" : "alerta", 20)), h("span", {}, texto));
+  return {
+    cartao: h("section", { class: "ass-cartao ass-pronto" },
+      h("span", { class: "selo-ok" }, icone("certo", 36)),
+      h("h1", {}, "Tudo pronto!"),
+      h("p", { class: "explica", style: "max-width:46ch" }, "O robô está pronto para cadastrar. Agora é só " + (cfg.servidor ? "enviar as pastas dos clientes." : "escolher os clientes na lista.")),
+      h("ul", { class: "resumo-ass" },
+        item(!!cfg.nome, "Escritório: ", h("strong", {}, cfg.nome)),
+        item(p.cpf && p.tem_senha && p.tem_totp, "Acesso ao PJe: ", h("strong", {}, assistFalhouTexto())),
+        item(!!cfg.prefixo_anexo, "Anexos começam com ", h("strong", {}, cfg.prefixo_anexo))),
+      h("button", { class: "botao principal grande", type: "button", onclick: () => {
+          fecharAssistente("cadastro");
+          if (cfg.servidor) $("#escolher-pastas").click();
+        } }, icone("enviar", 20), cfg.servidor ? "Enviar a primeira pasta" : "Ir para os clientes"),
+      cfg.servidor ? h("p", { class: "dica" }, "Também dá para arrastar as pastas direto para a lista de clientes.") : null),
+    rodape: null};
+}
+const assistFalhouTexto = () => est.teste_login && est.teste_login.ok ? "testado, entrou sem problemas" : "guardado";
+const siglaDe = nome => { const partes = (nome || "Autus").split(/\s+/).filter(p => p.length > 2 || /^[A-Z]/.test(p));
+  return (partes.length === 1 ? partes[0].slice(0, 2) : partes.slice(0, 2).map(p => p[0]).join("")).toUpperCase() || "AU"; };
+const formatarCpf = c => String(c).replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
 function cfgOrdem() {
   return secaoCfg("ordem", "Quem manda em cada campo", "Quando duas fontes discordam, vale a de cima.",
     h("ol", { class: "escada" }, [["Correção na ficha", "O que você mudou na tela do cliente"],
@@ -1305,6 +1607,8 @@ function cfgOrdem() {
       ["Padrão do escritório", "Só quando nada acima respondeu"]].map(([t, d], i) => h("li", {}, h("b", {}, String(i + 1)), h("strong", {}, t), h("span", {}, d)))));
 }
 function secaoCfg(id, titulo, intro, ...corpo) {
+  if (embutido)  // dentro de um bloco do Avançado: o título já está no bloco
+    return h("div", { class: "secao-cfg", id: "cfg-" + id, style: "padding:0" }, intro ? h("p", { class: "intro" }, intro) : null, h("div", { class: "corpo" }, corpo));
   return h("section", { class: "cartao secao-cfg", id: "cfg-" + id }, h("h2", {}, titulo),
     intro ? h("p", { class: "intro" }, intro) : null, h("div", { class: "corpo" }, corpo));
 }
@@ -1331,29 +1635,11 @@ function seletorDeCor() {
   desenhar();
   return caixa;
 }
-function cfgEscritorio() {
-  return secaoCfg("escritorio", "Escritório", "Como o programa se apresenta para quem usa. " + (cfg.servidor ? "Fica no servidor, só para o seu escritório." : "Tudo fica só neste computador."),
-    campo("Nome do escritório", ligado("nome", { placeholder: "ex.: Silva & Souza Advogados" }, v => v, aplicarIdentidade)),
-    campo("Cor do escritório", seletorDeCor(), "Aparece no símbolo e nos botões principais."));
-}
-function cfgLogin() {
-  const senha = h("input", { type: "password", autocomplete: "new-password", value: pjeDigitado.senha,
-    placeholder: cfg.pje.tem_senha ? "guardada (deixe em branco para manter)" : "não preenchida", oninput: ev => { pjeDigitado.senha = ev.target.value; mudou(); } });
-  const totp = h("input", { id: "c-totp", type: "password", autocomplete: "off", value: pjeDigitado.totp_key,
-    placeholder: cfg.pje.tem_totp ? "guardada (deixe em branco para manter)" : "não preenchida", oninput: ev => { pjeDigitado.totp_key = ev.target.value; mudou(); } });
-  return secaoCfg("login", "Login do PJe", "O robô entra no PJe com CPF, senha e o código do autenticador, sem certificado digital. A senha não aparece aqui depois de salva.",
-    h("div", { class: "grade2" },
-      campo("CPF", h("input", { class: "mono", inputmode: "numeric", value: pjeDigitado.cpf, oninput: ev => { pjeDigitado.cpf = ev.target.value; mudou(); } })),
-      campo("Senha do PJe", senha)),
-    campo("Chave do autenticador", totp, "Se você já tem a chave do app autenticador (2 fatores), cole aqui. Não são os 6 números."),
-    leitorDeQR(totp),
-    h("div", { class: "autenticador", id: "autenticador" }));
-}
 // print ou foto do QR (o do PJe ou o de "Transferir contas" do Google Authenticator): o robô lê a chave e põe no campo
-function leitorDeQR(campoChave) {
+function leitorDeQR(campoChave, texto = "Ler a chave de um QR (print ou foto)") {
   const resultado = h("div", {});
   const arquivo = h("input", { type: "file", accept: "image/*", hidden: true, "aria-label": "Imagem do QR" });
-  const botao = h("button", { class: "botao", type: "button", onclick: () => arquivo.click() }, "Ler a chave de um QR (print ou foto)");
+  const botao = h("button", { class: "botao", type: "button", onclick: () => arquivo.click() }, icone("enviar"), texto);
   arquivo.addEventListener("change", async () => {
     const imagem = arquivo.files[0];
     arquivo.value = "";
@@ -1368,7 +1654,7 @@ function leitorDeQR(campoChave) {
       encher(resultado, h("div", { class: "aviso ok" }, icone("certo"), h("div", {},
         h("strong", {}, `QR lido: conta ${[dados.emissor, dados.nome].filter(Boolean).join(" · ") || "do autenticador"}.`),
         h("p", {}, "Confira no app do celular: o código desta conta agora é ", h("span", { class: "mono" }, dados.codigo),
-          " (muda a cada 30 segundos). Se bater, clique em Salvar alterações."))));
+          " (muda a cada 30 segundos). Se bater, está certo."))));
     } catch (e) {
       encher(resultado, h("div", { class: "aviso erro" }, icone("erro"), h("p", {}, e.message)));
     } finally { botao.disabled = false; }
@@ -1394,6 +1680,8 @@ function desenharAutenticador() {
   if (!caixa) return;
   autenticadorDesenhado = marcaAutenticador();
   const a = est.autenticador || {}, rodando = est.tarefa === "autenticador";
+  // no assistente, o botão de começar é dele: aqui só o link do e-mail, o andamento, o erro e o QR do fim
+  if (caixa.dataset.assistente && !a.etapa && !rodando) return encher(caixa);
   const cancelar = h("button", { class: "botao", type: "button", onclick: () => acaoAutenticador("/api/parar", {}) }, "Cancelar");
   if (a.etapa === "link") {
     const link = h("input", { type: "url", placeholder: "https://sso.cloud.pje.jus.br/...", "aria-label": "Link do e-mail do PJe" });
@@ -1438,29 +1726,23 @@ function desenharAutenticador() {
       onclick: () => acaoAutenticador("/api/autenticador", {}) }, a.etapa === "erro" ? "Tentar de novo" : "Configurar o código pelo robô"),
       falta ? h("span", { class: "dica" }, falta) : null));
 }
-function cfgDocumentos() {
-  const exemplo = h("span", { class: "dica" });
-  const atualizarExemplo = () => exemplo.textContent = `Ex.: "${cfg.prefixo_anexo || ""} 01] Documentos pessoais.pdf" é o 1º anexo. O PDF que não começa assim é a petição inicial.`;
-  atualizarExemplo();
+// (Avançado) o tipo de documento de cada anexo no PJe; no modo local, também a pausa entre as ações do robô
+function cfgTiposDocumento() {
   const tipoAnexo = chave => escolha(chave, cfg[chave], tiposDocumento(), { aoMudar: ev => { cfg[chave] = ev.target.value; mudou(); } });
-  return secaoCfg("documentos", "Pastas e documentos", cfg.servidor ? "Como o escritório organiza os arquivos de cada cliente."
-      : "Onde estão os clientes e como o escritório organiza os arquivos de cada um.",
-    cfg.servidor ? null : campo("Pasta dos clientes", ligado("pasta_clientes", { class: "mono" }), "Cada cliente é uma pasta aqui dentro. Os já cadastrados vão para a subpasta Concluído."),
-    h("div", { class: "grade3" },
-      campo("O nome dos anexos começa com", ligado("prefixo_anexo", {}, v => v, atualizarExemplo)),
-      campo("Tipo do 1º anexo no PJe", tipoAnexo("anexo_primeiro")),
-      campo("Tipo dos demais anexos", tipoAnexo("anexo_demais"))),
-    exemplo,
-    (() => {
+  return secaoCfg("tipos", "Documentos no PJe", "O 1º anexo e os demais entram no PJe com estes tipos de documento.",
+    h("div", { class: "grade2" }, campo("Tipo do 1º anexo no PJe", tipoAnexo("anexo_primeiro")), campo("Tipo dos demais anexos", tipoAnexo("anexo_demais"))),
+    cfg.servidor ? null : (() => {  // no servidor ninguém assiste o Chrome do robô: a pausa não serve para nada
       const fmt = v => `${String(v ?? 0).replace(".", ",")} ${Number(v) === 1 ? "segundo" : "segundos"}`;
       const valor = h("strong", {}, fmt(cfg.pausa_segundos));
       return campo(h("span", { class: "rotulo-faixa" }, "Pausa entre as ações do robô", valor),
         ligado("pausa_segundos", { type: "range", class: "faixa", min: 0, max: 10, step: 0.5 }, Number, () => valor.textContent = fmt(cfg.pausa_segundos)),
         "0 é o mais rápido. De 3 a 5 segundos dá para acompanhar no Chrome.");
-    })(),
-    h("h3", {}, "Modelo do documento de cadastro (.docx)"),
-    h("p", { class: "dica" }, "O robô lê do .docx as linhas \"Rótulo: valor\" e as tabelas de duas colunas. Se o modelo do escritório chama um campo por outro nome, ensine aqui. Entre parênteses está o rótulo que ele já entende sozinho."),
-    tabelaDePares(rotulos, [["rotulo", "Rótulo no seu documento", { placeholder: "ex.: Nome do Autor" }],
+    })());
+}
+// (Avançado) quando o .docx do escritório chama um campo por outro nome
+function cfgRotulos() {
+  return secaoCfg("rotulos", "Ficha do cliente (.docx)", "O robô lê do .docx as linhas \"Rótulo: valor\" e as tabelas de duas colunas. Se o modelo do escritório chama um campo por outro nome, ensine aqui. Entre parênteses está o rótulo que ele já entende sozinho.",
+    tabelaDePares(rotulos, [["rotulo", "Rótulo no documento", { placeholder: "ex.: Nome do Autor" }],
       ["campo", "Campo do robô", { opcoes: cfg.campos.map(([c, n]) => [c, `${n} (${c})`]) }]], "Adicionar rótulo"));
 }
 function tabelaDePares(lista, colunas, textoNovo, classe = "") {
@@ -1558,7 +1840,8 @@ let pjeDigitado = { cpf: "", senha: "", totp_key: "" };
 function mudou() {
   haMudancas = true; $("#msg-salvar").textContent = "Há alterações não salvas."; $("#msg-salvar").style.color = ""; mostrarBarraSalvar();
   if (!est.tarefa) desenharAutenticador();  // o botão do código espera salvar o CPF e a senha
-  desenharResumo();
+  limparAvisoAss();
+
 }
 function mostrarBarraSalvar() { $("#salvar-barra").hidden = !(haMudancas && !$("#tela-config").hidden); }
 async function carregarEscritorio() {
@@ -1855,7 +2138,8 @@ areaDeSoltar.addEventListener("drop", async ev => {
 window.addEventListener("dragover", ev => { if (cfg && cfg.servidor) ev.preventDefault(); });
 window.addEventListener("drop", ev => { if (cfg && cfg.servidor) ev.preventDefault(); });
 $("#descartar").addEventListener("click", carregarEscritorio);
-$("#salvar").addEventListener("click", async () => {
+// grava tudo o que está na tela (Ajustes e assistente) e relê do robô; para (Error) com a mensagem se não der
+async function salvarConfig() {
   const { campos, pessoas, pje, ...resto } = cfg;
   const corpo = { ...resto,
     rotulos_docx: Object.fromEntries(rotulos.filter(r => r.rotulo.trim() && r.campo).map(r => [r.rotulo.trim().toLowerCase(), r.campo])),
@@ -1863,9 +2147,12 @@ $("#salvar").addEventListener("click", async () => {
     dicionario: dicionario.filter(t => t.frases.trim() || t.assunto.trim() || t.materia).map(t => ({
       frases: t.frases.split(";").map(f => f.trim()).filter(Boolean), assunto: t.assunto.trim(), materia: t.materia })),
     padrao: Object.fromEntries(Object.entries(cfg.padrao).filter(([, v]) => v)), pje: pjeDigitado };
+  await api("/api/escritorio", corpo);
+  await carregarEscritorio();
+}
+$("#salvar").addEventListener("click", async () => {
   try {
-    await api("/api/escritorio", corpo);
-    await carregarEscritorio();
+    await salvarConfig();
     $("#salvar-barra").hidden = false;
     $("#msg-salvar").textContent = "Alterações salvas."; $("#msg-salvar").style.color = "#62D6A0";
     setTimeout(mostrarBarraSalvar, 2500);
@@ -2031,6 +2318,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
     return setTimeout(() => location.reload(), 15000);
   }
   if (cfg.servidor) { try { souAdmin = (await api("/eu")).admin; } catch (e) {} aplicarAdmin(); }
+  if (precisaAssistente()) abrirAssistente(1, "primeiro");  // escritório novo: primeiro acesso, uma pergunta por tela
   await Promise.all([carregarMapa(), atualizarEstado()]);  // independentes: em paralelo (#16)
   await carregarClientes();
   let consultando = false, ultima = 0;

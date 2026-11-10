@@ -44,7 +44,7 @@ app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # envio de pastas de clientes (servidor)
 app.config["MAX_FORM_PARTS"] = 20000  # cada arquivo enviado são 2 partes (arquivo e caminho); o padrão, 1000, é pouco
 # ponytail: estado em memória de um único usuário local; servidor central pediria sessão por escritório
-estado = {"tarefa": "", "atual": "", "log": [], "pausa": None, "resultados": {}, "autenticador": None}
+estado = {"tarefa": "", "atual": "", "log": [], "pausa": None, "resultados": {}, "autenticador": None, "teste_login": None}
 respostas = queue.Queue()
 trava = threading.Lock()
 escritorio = robo.carregar_escritorio()
@@ -289,7 +289,8 @@ def ver_estado():
     desde = request.args.get("desde", 0, type=int)
     return jsonify(tarefa=estado["tarefa"], atual=estado["atual"], pausa=estado["pausa"],
                    resultados=estado["resultados"], log=estado["log"][desde:], total=len(estado["log"]),
-                   etapas=[n for n, _ in robo.ETAPAS], autenticador=estado["autenticador"])
+                   etapas=[n for n, _ in robo.ETAPAS], autenticador=estado["autenticador"],
+                   teste_login=estado["teste_login"])
 
 
 @app.get("/api/escritorio")
@@ -297,6 +298,7 @@ def ver_escritorio():
     pje = robo.ler_config()
     return jsonify(servidor=robo.SERVIDOR,
         nome=escritorio.get("nome", ""), cor=escritorio.get("cor", COR_PADRAO), pasta_clientes=raiz(),
+        assistente_feito=bool(escritorio.get("assistente_feito")),  # o primeiro acesso (assistente da página) terminou
         pausa_segundos=robo.PAUSA_SEGUNDOS, raca_padrao=robo.RACA_PADRAO, prefixo_anexo=robo.PREFIXO_ANEXO,
         anexo_primeiro=robo.TIPOS_ANEXO[0], anexo_demais=robo.TIPOS_ANEXO[1], rotulos_docx=robo.ROTULOS_DOCX,
         partes_conhecidas=robo.CNPJ_CONHECIDO, dicionario=robo.DICIONARIO, padrao=robo.PADRAO,
@@ -570,6 +572,29 @@ def parar():
     if (estado["autenticador"] or {}).get("etapa") == "link":
         links.put("")  # solta o robô que esperava o link do e-mail
     return jsonify(ok=True)
+
+
+def testar_login():
+    """(thread) "Testar e continuar" do primeiro acesso: o robô entra no PJe uma vez e diz se deu certo."""
+    estado["teste_login"] = {"rodando": True}
+    try:
+        abrir_pje()
+    except SystemExit as e:
+        estado["teste_login"] = {"ok": False, "msg": str(e)}
+        raise
+    estado["teste_login"] = {"ok": True}
+    robo.log("Login no PJe testado: entrou sem problemas.")
+
+
+@app.post("/api/testar-login")
+def iniciar_teste_login():
+    config = robo.ler_config()
+    if not (config.get("cpf") and config.get("senha")):
+        abort(400, "Salve o CPF e a senha do PJe antes de testar.")
+    if estado["tarefa"]:
+        abort(409, "O robô já está trabalhando. Espere terminar ou clique em Parar.")
+    estado["teste_login"] = {"rodando": True}  # antes de começar: a página não pode ver o resultado do teste anterior
+    return em_tarefa("testar", testar_login)
 
 
 @app.post("/api/autenticador")
