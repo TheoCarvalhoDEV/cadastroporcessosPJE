@@ -67,6 +67,39 @@ def test_uv_nao_le_configuracao_de_quem_rodou():
         assert linhas and all("--no-config" in l for l in linhas), (nome, linhas)
 
 
+def test_publicar_pagina_no_firebase_hosting():
+    """A página vai para o Firebase com o endereço do servidor, as regras de segurança e só os arquivos que mudaram;
+    e o atualizar.sh publica ANTES de reiniciar o porteiro (que passa a mandar o endereço do servidor para lá)."""
+    import gzip
+    import publicar_pagina
+    from unittest import mock
+    api = "https://1-2-3-4.sslip.io"
+    arquivos = publicar_pagina.arquivos(api)
+    assert f'<meta name="api" content="{api}">' in arquivos["/index.html"].decode("utf-8")
+    assert any(c.startswith("/fontes/") and c.endswith(".woff2") for c in arquivos)
+    cfg = publicar_pagina.configuracao(api)
+    assert cfg["rewrites"] == [{"glob": "**", "path": "/index.html"}]  # /nova-senha do e-mail mostra a página
+    politica = cfg["headers"][0]["headers"]["Content-Security-Policy"]
+    assert f"connect-src 'self' {api}" in politica and "frame-ancestors 'none'" in politica
+    chamadas = []
+
+    def chamar(token, metodo, url, corpo=None, tipo="application/json"):
+        chamadas.append((metodo, url, corpo))
+        if url.endswith(":populateFiles"):  # o Firebase pede só o index.html (as fontes já estavam lá)
+            pedidos = {h for c, h in corpo["files"].items() if c == "/index.html"}
+            return {"uploadRequiredHashes": sorted(pedidos), "uploadUrl": "https://upload/x"}
+        return {"name": "sites/autus/versions/v1"} if url == "sites/autus/versions" else {}
+    with mock.patch.object(publicar_pagina, "chamar", chamar):
+        assert publicar_pagina.publicar("autus", api, "TOKEN") == 1
+    enviados = [c for c in chamadas if c[1].startswith("https://upload/x/")]
+    assert len(enviados) == 1 and api.encode() in gzip.decompress(enviados[0][2])
+    assert [c[:2] for c in chamadas[-2:]] == [("PATCH", "sites/autus/versions/v1?update_mask=status"),
+                                              ("POST", "sites/autus/releases?versionName=sites/autus/versions/v1")]
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "servidor", "atualizar.sh"), encoding="utf-8") as f:
+        atualizar = f.read()
+    assert atualizar.index("publicar_pagina.py") < atualizar.index("systemctl restart porteiro")
+
+
 if __name__ == "__main__":
     testes = [f for n, f in sorted(globals().items()) if n.startswith("test_")]
     for t in testes:

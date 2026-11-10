@@ -13,10 +13,9 @@ from werkzeug.serving import make_server
 
 RAIZ = tempfile.mkdtemp()
 os.environ.update(ROBO_RAIZ=RAIZ, ROBO_CHAVE_SESSAO="teste", FIREBASE_API_KEY="x")
+os.environ.pop("ROBO_SITE", None)  # sem site: a página sai do próprio porteiro (o teste do site liga à parte)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "servidor"))
 import porteiro
-
-porteiro.app.config["SESSION_COOKIE_SECURE"] = False  # o cliente de teste usa http
 
 falso = Flask("escritorio_falso")
 
@@ -51,6 +50,11 @@ def entrar(web, email):
         return web.post("/entrar", json={"email": email, "senha": "certa"})
 
 
+def chave(web, email):
+    """O cabeçalho com a chave de sessão que o login devolve (a página guarda e manda em cada pedido)."""
+    return {"Authorization": "Bearer " + entrar(web, email).get_json()["sessao"]}
+
+
 def test_porteiro():
     gravar_escritorios(teste={"nome": "Teste", "porta": servidor.server_port, "emails": ["ana@x.com"]},
                        parado={"nome": "Parado", "porta": PORTA_PARADA, "emails": ["bia@x.com"]})
@@ -60,27 +64,66 @@ def test_porteiro():
     with mock.patch.object(porteiro, "entrar_no_firebase", lambda e, s: False):
         assert web.post("/entrar", json={"email": "ana@x.com", "senha": "errada"}).status_code == 401
     assert entrar(web, "carlos@x.com").status_code == 403  # senha certa, sem escritório
-    assert entrar(web, "Ana@X.com").status_code == 200  # maiúsculas não importam
-    assert "Set-Cookie" not in web.get("/api/eco").headers  # as 12 h contam do login (a página consulta a cada segundo)
-    j = web.get("/api/eco?x=1").get_json()
+    ana = chave(web, "Ana@X.com")  # maiúsculas não importam
+    assert "Set-Cookie" not in entrar(web, "ana@x.com").headers  # a sessão é a chave, não cookie
+    j = web.get("/api/eco?x=1", headers=ana).get_json()
     assert j == {"metodo": "GET", "query": "x=1", "tipo": "", "tamanho": 0, "cookie": ""}  # sessão não vai ao robô
     j = web.post("/api/eco", data={"arquivos": (io.BytesIO(b"%PDF-1"), "a.pdf")},
-                 content_type="multipart/form-data").get_json()
+                 content_type="multipart/form-data", headers=ana).get_json()
     assert j["metodo"] == "POST" and j["tipo"].startswith("multipart/form-data") and j["tamanho"] > 6
     # nome de pasta de cliente com espaço, acento, colchete e % chega igual ao robô
-    j = web.get("/api/clientes/Fulana%20de%20Tal%20%5BA%C3%A7%C3%A3o%5D%2050%25?x=%C3%A9").get_json()
+    j = web.get("/api/clientes/Fulana%20de%20Tal%20%5BA%C3%A7%C3%A3o%5D%2050%25?x=%C3%A9", headers=ana).get_json()
     assert j == {"nome": "Fulana de Tal [Ação] 50%", "query": "x=%C3%A9"}, j
-    assert web.post("/api/eco", json={}, headers={"Origin": "https://mal.exemplo"}).status_code == 403
-    assert web.post("/api/eco", json={}, headers={"Origin": "http://localhost"}).status_code == 200
+    assert web.post("/api/eco", json={}, headers={**ana, "Origin": "https://mal.exemplo"}).status_code == 403
+    assert web.post("/api/eco", json={}, headers={**ana, "Origin": "http://localhost"}).status_code == 200
+    # chave alterada (outro e-mail colado no meio) ou vencida não vale
+    falsa = ana["Authorization"][:-3] + ("AAA" if not ana["Authorization"].endswith("AAA") else "BBB")
+    assert web.get("/api/eco", headers={"Authorization": falsa}).status_code == 401
+    with mock.patch.object(porteiro, "VALIDADE_SESSAO", -1):
+        assert web.get("/api/eco", headers=ana).status_code == 401
     gravar_escritorios(parado={"nome": "Parado", "porta": PORTA_PARADA, "emails": ["bia@x.com"]})
-    assert web.get("/api/eco").status_code == 401  # tirar o e-mail corta o acesso na hora
-    outro = porteiro.app.test_client()
-    entrar(outro, "bia@x.com")
-    r = outro.get("/api/estado")
+    assert web.get("/api/eco", headers=ana).status_code == 401  # tirar o e-mail corta o acesso na hora
+    r = web.get("/api/estado", headers=chave(web, "bia@x.com"))
     assert r.status_code == 502 and "reiniciando" in r.get_json()["erro"]
     with mock.patch.object(porteiro, "pedir_nova_senha", lambda e: None):
         assert web.post("/esqueci", json={"email": "ninguem@x.com"}).status_code == 200
     assert web.get("/saude").status_code == 200
+
+
+def test_sair_encerra_a_chave():
+    gravar_escritorios(teste={"nome": "Teste", "porta": servidor.server_port, "emails": ["ana@x.com"]})
+    web = porteiro.app.test_client()
+    ana, outra = chave(web, "ana@x.com"), chave(web, "ana@x.com")  # dois navegadores da mesma pessoa
+    assert web.post("/sair", headers=ana).status_code == 200
+    assert web.get("/api/eco", headers=ana).status_code == 401  # a chave de quem saiu não vale mais
+    assert web.get("/api/eco", headers=outra).status_code == 200  # o outro navegador continua
+    assert web.post("/sair").status_code == 200  # sair sem chave não dá erro
+
+
+def test_pagina_no_firebase_hosting():
+    """Com ROBO_SITE, a página fica em https://<site>.web.app: só ela chama o servidor de fora (CORS), e quem chega
+    pelo endereço do servidor vai para lá (com o caminho e o código do e-mail de criar senha)."""
+    gravar_escritorios(teste={"nome": "Teste", "porta": servidor.server_port, "emails": ["ana@x.com"]})
+    web = porteiro.app.test_client()
+    with mock.patch.multiple(porteiro, PAGINA="https://autus.web.app",
+                             ORIGENS={"https://autus.web.app", "https://autus.firebaseapp.com"}):
+        r = web.get("/nova-senha?mode=resetPassword&oobCode=abc")
+        assert r.status_code == 302 and r.headers["Location"] == "https://autus.web.app/nova-senha?mode=resetPassword&oobCode=abc"
+        assert web.get("/").headers["Location"] == "https://autus.web.app/"
+        pagina = {"Origin": "https://autus.web.app"}
+        r = web.options("/api/estado", headers={**pagina, "Access-Control-Request-Method": "GET",
+                                                 "Access-Control-Request-Headers": "authorization"})
+        assert r.status_code == 204 and r.headers["Access-Control-Allow-Origin"] == "https://autus.web.app"
+        assert "Authorization" in r.headers["Access-Control-Allow-Headers"]
+        assert web.options("/api/estado", headers={"Origin": "https://mal.exemplo"}).status_code == 403
+        r = web.post("/entrar", json={"email": "ana@x.com", "senha": "certa"}, headers=pagina)
+        assert r.status_code != 403 and r.headers["Access-Control-Allow-Origin"] == "https://autus.web.app"
+        ana = {**pagina, **chave(web, "ana@x.com")}
+        r = web.post("/api/eco", json={}, headers=ana)
+        assert r.status_code == 200 and r.headers["Access-Control-Allow-Origin"] == "https://autus.web.app"
+        r = web.get("/api/eco", headers={"Origin": "https://mal.exemplo", "Authorization": ana["Authorization"]})
+        assert "Access-Control-Allow-Origin" not in r.headers  # outro site não lê a resposta
+        assert web.post("/entrar", json={}, headers={"Origin": "https://mal.exemplo"}).status_code == 403
 
 
 def test_criar_senha_pelo_link_do_email():

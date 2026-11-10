@@ -1,37 +1,45 @@
-"""Porteiro do servidor: entrega a página, faz o login (Firebase Authentication pela API REST), guarda a sessão em
-cookie e repassa /api/* ao robô do escritório da pessoa (um app_web.py por escritório, em 127.0.0.1).
+"""Porteiro do servidor: faz o login (Firebase Authentication pela API REST), dá a chave de sessão e repassa /api/*
+ao robô do escritório da pessoa (um app_web.py por escritório, em 127.0.0.1).
+A página sai do Firebase Hosting (https://<ROBO_SITE>.web.app, publicada por publicar_pagina.py) e fala com este
+servidor em outro endereço: por isso a sessão é uma chave assinada que a página manda no cabeçalho Authorization
+(cookie não vai entre endereços diferentes) e só a página do Firebase pode chamar (CORS). Sem ROBO_SITE, a página
+sai daqui mesmo, como antes.
 O escritório sai SEMPRE da sessão + escritorios.json, nunca do pedido.
-Ambiente: ROBO_RAIZ (/srv/robo), ROBO_CHAVE_SESSAO, FIREBASE_API_KEY, ROBO_PORTA_PORTEIRO (8800).
+Ambiente: ROBO_RAIZ (/srv/robo), ROBO_CHAVE_SESSAO, FIREBASE_API_KEY, ROBO_PORTA_PORTEIRO (8800), ROBO_SITE (autus).
 Uso (servidor/porteiro.service): python porteiro.py
 """
-import datetime
 import http.client
 import json
 import os
 import secrets
+import threading
+import time
 import urllib.error
 import urllib.request
 from urllib.parse import quote, urlparse
-from flask import Flask, Response, abort, jsonify, request, send_file, send_from_directory, session
+from flask import Flask, Response, abort, jsonify, redirect, request, send_file, send_from_directory
+from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 RAIZ = os.environ.get("ROBO_RAIZ", "/srv/robo")
 ARQUIVO_ESCRITORIOS = os.path.join(RAIZ, "escritorios.json")
+ARQUIVO_ENCERRADAS = os.path.join(RAIZ, "sessoes_encerradas.json")  # quem clicou em Sair: a chave não vale mais
 API_KEY = os.environ["FIREBASE_API_KEY"]
 PORTA = int(os.environ.get("ROBO_PORTA_PORTEIRO", 8800))
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sistema", "web")
+SITE = os.environ.get("ROBO_SITE", "")  # o site do Firebase Hosting onde a página fica
+PAGINA = f"https://{SITE}.web.app" if SITE else ""
+ORIGENS = {PAGINA, f"https://{SITE}.firebaseapp.com"} if SITE else set()  # quem pode chamar o servidor de fora
+VALIDADE_SESSAO = 12 * 3600  # 12 h desde o login
 # a regra de senha fica no Firebase (Authentication > Settings > Password policy): mínimo 10 e pelo menos um número
 REGRA_DA_SENHA = "A senha precisa de pelo menos 10 caracteres, com pelo menos um número."
 
-REPASSA_IDA = ("Content-Type", "Content-Length", "If-None-Match", "Accept-Encoding")  # nunca o Cookie da sessão
+REPASSA_IDA = ("Content-Type", "Content-Length", "If-None-Match", "Accept-Encoding")  # nunca a chave da sessão
 REPASSA_VOLTA = ("Content-Type", "Content-Encoding", "ETag", "Cache-Control", "Vary")
 
 app = Flask(__name__, static_folder=None)
-app.config.update(
-    SECRET_KEY=os.environ["ROBO_CHAVE_SESSAO"],
-    SESSION_COOKIE_SECURE=True, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Strict",
-    PERMANENT_SESSION_LIFETIME=datetime.timedelta(hours=12),
-    SESSION_REFRESH_EACH_REQUEST=False,  # 12 h desde o login (a página consulta a cada segundo e renovaria sempre)
-    MAX_CONTENT_LENGTH=210 * 1024 * 1024)  # o robô do escritório confere os 200 MB e dá a mensagem
+app.config.update(MAX_CONTENT_LENGTH=210 * 1024 * 1024)  # o robô do escritório confere os 200 MB e dá a mensagem
+assinador = URLSafeTimedSerializer(os.environ["ROBO_CHAVE_SESSAO"], salt="sessao")
+trava_encerradas = threading.Lock()
 
 
 # ---------- escritórios e Firebase ----------
@@ -105,14 +113,71 @@ def criar_usuario(email):
         raise SystemExit(f"Não consegui criar o usuário {email} no Firebase: {resposta}")
 
 
+# ---------- sessão ----------
+
+def nova_sessao(email):
+    """Chave assinada (não dá para inventar nem alterar sem ROBO_CHAVE_SESSAO) com o e-mail e um número só dela."""
+    return assinador.dumps({"email": email, "id": secrets.token_urlsafe(12)})
+
+
+def ler_sessao():
+    """{"email", "id"} da chave do cabeçalho Authorization, ou None (sem chave, alterada, vencida ou encerrada)."""
+    chave = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if not chave:
+        return None
+    try:
+        dados = assinador.loads(chave, max_age=VALIDADE_SESSAO)
+    except BadSignature:  # inclui SignatureExpired
+        return None
+    return None if dados.get("id") in encerradas() else dados
+
+
+def encerradas():
+    try:
+        with open(ARQUIVO_ENCERRADAS, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, ValueError):
+        return {}
+
+
+def encerrar(id_):
+    """Sair: a chave para de valer na hora (fica anotada até vencer sozinha; as vencidas saem da lista)."""
+    with trava_encerradas:
+        agora = time.time()
+        lista = {i: fim for i, fim in encerradas().items() if fim > agora}
+        lista[id_] = agora + VALIDADE_SESSAO
+        with open(ARQUIVO_ENCERRADAS + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(lista, f)
+        os.replace(ARQUIVO_ENCERRADAS + ".tmp", ARQUIVO_ENCERRADAS)
+
+
 # ---------- rotas ----------
+
+def origem_permitida(origem):
+    return origem in ORIGENS or urlparse(origem).netloc == request.host
+
 
 @app.before_request
 def mesma_origem():
-    """POST só da própria página (além do cookie SameSite=Strict)."""
+    """POST só da própria página: a do Firebase Hosting ou a servida aqui. O pedido de licença do navegador (OPTIONS,
+    antes de mandar a chave para outro endereço) é respondido aqui."""
     origem = request.headers.get("Origin")
-    if request.method == "POST" and origem and urlparse(origem).netloc != request.host:
+    if request.method == "OPTIONS":
+        return ("", 204) if origem and origem_permitida(origem) else abort(403)
+    if request.method == "POST" and origem and not origem_permitida(origem):
         abort(403)
+
+
+@app.after_request
+def liberar_para_a_pagina(resposta):
+    """CORS: só a página do Firebase Hosting lê as respostas e manda a chave da sessão. Sem cookies."""
+    origem = request.headers.get("Origin")
+    if origem in ORIGENS:
+        resposta.headers.update({"Access-Control-Allow-Origin": origem, "Access-Control-Allow-Methods": "GET, POST",
+                                 "Access-Control-Allow-Headers": "Authorization, Content-Type",
+                                 "Access-Control-Max-Age": "600"})
+        resposta.vary.add("Origin")
+    return resposta
 
 
 @app.errorhandler(403)
@@ -128,6 +193,8 @@ def grande_demais(e):
 @app.get("/")
 @app.get("/nova-senha")  # link do e-mail de criar senha (a página monta o formulário a partir do caminho)
 def pagina():
+    if PAGINA:  # a página fica no Firebase Hosting: quem chega pelo endereço do servidor vai para lá
+        return redirect(PAGINA + request.full_path.rstrip("?"), 302)
     r = send_file(os.path.join(WEB, "index.html"))
     r.headers["Cache-Control"] = "no-cache"
     return r
@@ -159,15 +226,13 @@ def entrar():
         return jsonify(erro="E-mail ou senha errados."), 401
     if not escritorio_do_email(email):
         return jsonify(erro="Este e-mail não está ligado a nenhum escritório."), 403
-    session.clear()
-    session["email"] = email
-    session.permanent = True
-    return jsonify(ok=True)
+    return jsonify(ok=True, sessao=nova_sessao(email))
 
 
 @app.post("/sair")
 def sair():
-    session.clear()
+    if dados := ler_sessao():
+        encerrar(dados["id"])
     return jsonify(ok=True)
 
 
@@ -201,9 +266,8 @@ def nova_senha():
 
 @app.route("/api/<path:resto>", methods=["GET", "POST"])
 def api(resto):
-    escritorio = escritorio_do_email(session.get("email"))
+    escritorio = escritorio_do_email((ler_sessao() or {}).get("email"))
     if not escritorio:
-        session.clear()
         return jsonify(erro="Entre com seu e-mail e senha.", entrar=True), 401
     return repassar(escritorio["porta"])
 

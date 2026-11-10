@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- endereço do servidor quando a página sai do Firebase Hosting (servidor/publicar_pagina.py preenche); vazio: a
+     página e o servidor são o mesmo endereço (modo local, ou o próprio servidor) -->
+<meta name="api" content="">
 <title>Cadastro no PJe</title>
 <link rel="icon" href="data:,">
 <link rel="preload" href="/fontes/plus-jakarta-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -593,19 +596,48 @@ function icone(nome, tamanho = 18) {
   s.innerHTML = `<svg viewBox="0 0 24 24" width="${tamanho}" height="${tamanho}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONES[nome]}</svg>`;
   return s;
 }
+// ---------- servidor: endereço e sessão ----------
+// A página pode sair do Firebase Hosting (autus.web.app) e falar com o servidor em outro endereço: API. A sessão é
+// uma chave assinada pelo porteiro (cookie não serve entre endereços diferentes), guardada neste navegador e mandada
+// em cada pedido. No modo local não há sessão nem API.
+const API = (document.querySelector('meta[name="api"]') || {}).content || "";
+let sessao = "";
+try { sessao = localStorage.getItem("sessao") || ""; } catch (e) {}
+function guardarSessao(chave) {
+  sessao = chave || "";
+  try { sessao ? localStorage.setItem("sessao", sessao) : localStorage.removeItem("sessao"); } catch (e) {}
+}
+const comSessao = (cabecalhos = {}) => sessao ? { ...cabecalhos, Authorization: "Bearer " + sessao } : cabecalhos;
+// pedidos com arquivo (FormData): o mesmo tratamento de erro do api()
+async function enviarArquivo(url, corpo, sinal) {
+  const r = await fetch(API + url, { method: "POST", body: corpo, headers: comSessao(), signal: sinal });
+  const dados = await r.json().catch(() => ({}));
+  if (r.status === 401 && dados.entrar) { guardarSessao(""); mostrarTela("entrar"); }
+  if (!r.ok) throw new Error(dados.erro || `O servidor respondeu ${r.status}.`);
+  return dados;
+}
+// foto de pausa: com sessão, <img src> não leva a chave; busca com ela e mostra a cópia local (blob)
+const fotosBuscadas = new Map();
+async function mostrarFoto(img, nome) {
+  if (!sessao) return img.src = "/api/foto/" + encodeURIComponent(nome);
+  if (!fotosBuscadas.has(nome)) fotosBuscadas.set(nome, fetch(API + "/api/foto/" + encodeURIComponent(nome), { headers: comSessao() })
+    .then(r => { if (!r.ok) throw new Error(); return r.blob(); }).then(b => URL.createObjectURL(b)));
+  try { img.src = await fotosBuscadas.get(nome); } catch (e) { fotosBuscadas.delete(nome); img.remove(); }
+}
+
 async function api(url, corpo, segundos = 30) {
   // tempo limite: se o programa travar ou fechar, a tela avisa em vez de ficar esperando para sempre
   const ctl = new AbortController(), tempo = setTimeout(() => ctl.abort(), segundos * 1000);
   let r;
   try {
-    r = await fetch(url, corpo === undefined ? { signal: ctl.signal } :
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo), signal: ctl.signal });
+    r = await fetch(API + url, corpo === undefined ? { headers: comSessao(), signal: ctl.signal } :
+      { method: "POST", headers: comSessao({ "Content-Type": "application/json" }), body: JSON.stringify(corpo), signal: ctl.signal });
   } catch (e) {
     throw new Error(e.name === "AbortError" ? `O programa não respondeu em ${segundos} segundos.`
-      : cfg && cfg.servidor ? "Sem conexão com o servidor. Confira a internet." : "Sem conexão com o programa. Ele está aberto?");
+      : cfg && cfg.servidor || API ? "Sem conexão com o servidor. Confira a internet." : "Sem conexão com o programa. Ele está aberto?");
   } finally { clearTimeout(tempo); }
   const dados = await r.json().catch(() => ({}));
-  if (r.status === 401 && dados.entrar) mostrarTela("entrar");  // servidor: sem sessão (ou ela venceu)
+  if (r.status === 401 && dados.entrar) { guardarSessao(""); mostrarTela("entrar"); }  // servidor: sem sessão (ou ela venceu)
   if (!r.ok) throw new Error(dados.erro || `O servidor respondeu ${r.status}.`);
   return dados;
 }
@@ -1073,8 +1105,11 @@ function desenharAndamento() {
           !cfg.servidor ? h("button", { class: "botao", type: "button", onclick: () => responder("continuar") }, "Já fiz no PJe, continuar")
             : p.rascunho ? h("button", { class: "botao", type: "button", onclick: () => responder("continuar") }, "Já resolvi no meu PJe, continuar") : null,
           h("button", { class: "botao", type: "button", onclick: () => responder("pular") }, "Pular este cliente")),
-        p.foto ? h("img", { src: "/api/foto/" + encodeURIComponent(p.foto), alt: "Como estava a tela do PJe quando o robô parou",
-          onclick: () => window.open("/api/foto/" + encodeURIComponent(p.foto)) }) : null), cartaoRegistro);
+        p.foto ? (() => {
+          const img = h("img", { alt: "Como estava a tela do PJe quando o robô parou", onclick: ev => window.open(ev.target.src) });
+          mostrarFoto(img, p.foto);
+          return img;
+        })() : null), cartaoRegistro);
       mostrarTela("cadastro");
       caixa.scrollIntoView({ block: "start" });
       return;
@@ -1259,10 +1294,7 @@ function leitorDeQR(campoChave) {
     corpo.append("imagem", imagem, imagem.name);
     botao.disabled = true;
     try {
-      const r = await fetch("/api/autenticador/ler-qr", { method: "POST", body: corpo });
-      const dados = await r.json().catch(() => ({}));
-      if (r.status === 401 && dados.entrar) return mostrarTela("entrar");
-      if (!r.ok) throw new Error(dados.erro || `O servidor respondeu ${r.status}.`);
+      const dados = await enviarArquivo("/api/autenticador/ler-qr", corpo);
       pjeDigitado.totp_key = campoChave.value = dados.chave;
       mudou();
       encher(resultado, h("div", { class: "aviso ok" }, icone("certo"), h("div", {},
@@ -1486,7 +1518,7 @@ function desenharEntrar() {
   const botao = h("button", { class: "botao principal grande", type: "submit" }, "Entrar");
   encher($("#tela-entrar"), h("form", { class: "cartao", onsubmit: async ev => {
     ev.preventDefault(); botao.disabled = true;
-    try { await api("/entrar", { email: email.value, senha: senha.value }); location.reload(); }
+    try { guardarSessao((await api("/entrar", { email: email.value, senha: senha.value })).sessao); location.reload(); }
     catch (e) { mostrar(e.message); botao.disabled = false; }
   } },
     h("h1", {}, "Cadastro no PJe"), h("p", { class: "dica", style: "margin:0" }, "Entre com o e-mail e a senha do seu escritório."),
@@ -1523,7 +1555,7 @@ function desenharNovaSenha() {
     campo("Senha nova", senha), campo("Repita a senha", repetir), msg, botao));
   senha.focus();
 }
-$("#sair").addEventListener("click", async () => { try { await api("/sair", {}); } finally { location.reload(); } });
+$("#sair").addEventListener("click", async () => { try { await api("/sair", {}); } finally { guardarSessao(""); location.reload(); } });
 // arrastar pastas: lê cada pasta solta (readEntries devolve em lotes; repete até vir vazio)
 async function arquivosDoArraste(itens) {
   const lista = [];
@@ -1556,10 +1588,7 @@ async function enviarPastas(selecionados) {
   const botao = $("#enviar-pastas"), ctl = new AbortController(), tempo = setTimeout(() => ctl.abort(), 600000);
   botao.disabled = true; botao.title = `Enviando ${lista.length} ${lista.length === 1 ? "arquivo" : "arquivos"}...`;
   try {
-    const r = await fetch("/api/clientes/enviar", { method: "POST", body: corpo, signal: ctl.signal });
-    const dados = await r.json().catch(() => ({}));
-    if (r.status === 401 && dados.entrar) return mostrarTela("entrar");
-    if (!r.ok) throw new Error(dados.erro || `O servidor respondeu ${r.status}.`);
+    const dados = await enviarArquivo("/api/clientes/enviar", corpo, ctl.signal);
     const n = dados.clientes.length, ig = fora.concat(dados.ignorados);
     informar(`${n} ${n === 1 ? "pasta enviada" : "pastas enviadas"}: ${dados.clientes.join(", ")}.` + (ig.length
       ? ` Ficaram de fora (só vale .pdf e .docx dentro da pasta do cliente): ${ig.slice(0, 5).join(", ")}${ig.length > 5 ? "..." : ""}` : ""));
@@ -1675,7 +1704,7 @@ function desenharRelatorio(r) {
         p.erros && vezes(p.erros, "parada com erro", "paradas com erro")].filter(Boolean).join(" · ");
       const quem = p.clientes.slice(0, 3).map(soNome).join(", ") + (p.clientes.length > 3 ? ` e mais ${p.clientes.length - 3}` : "");
       return h("details", { class: "problema", ontoggle: ev => {
-          if (ev.target.open && foto && !foto.getAttribute("src")) foto.src = "/api/foto/" + encodeURIComponent(p.foto); } },
+          if (ev.target.open && foto && !foto.getAttribute("src")) mostrarFoto(foto, p.foto); } },
         h("summary", {}, h("span", { class: "seta" }, icone("voltar", 16)),
           h("div", { class: "textos" }, h("strong", {}, p.tipo), h("div", { class: "sub" }, `${contagem} · ${quem}`)),
           h("span", { class: "vezes", title: vezes(p.vezes, "vez", "vezes") }, p.vezes)),
