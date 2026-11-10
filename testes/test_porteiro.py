@@ -182,6 +182,27 @@ def test_administrador():
     assert ("retirou e-mails", "silva") in acoes and ("entrou", None) in acoes
 
 
+def test_erros_de_todos_os_escritorios():
+    porteiro.escritorio_novo.gravar(porteiro.ARQUIVO_ESCRITORIOS, {"escritorios": {
+        "a": {"nome": "Alfa", "porta": 1, "emails": []}, "b": {"nome": "Beta", "porta": 2, "emails": []},
+        "c": {"nome": "Caído", "porta": 3, "emails": []}}, "admins": ["chefe@x.com"]})
+    erros = {1: [{"quando": "2026-11-10T10:00:00", "desfecho": "pausou", "grupo": "Login do PJe", "problema": "login"},
+                 {"quando": "2026-11-10T08:00:00", "desfecho": "resolveu sozinho", "grupo": "PJe lento", "problema": "net"}],
+             2: [{"quando": "2026-11-10T09:00:00", "desfecho": "parou com erro", "grupo": "Login do PJe", "problema": "login 2"}],
+             3: None}
+    web = porteiro.app.test_client()
+    chefe, ana = chave(web, "chefe@x.com"), None
+    with mock.patch.object(porteiro, "erros_do_robo", lambda porta, dias: erros[porta]):
+        r = web.get("/admin/erros?dias=30", headers=chefe).get_json()
+        assert [(x["escritorio"], x["quando"][11:13]) for x in r["erros"]] == [("a", "10"), ("b", "09"), ("a", "08")]
+        assert r["sem_resposta"] == ["Caído"] and r["dias"] == 30
+        assert r["ranking"] == [{"grupo": "Login do PJe", "vezes": 2, "escritorios": ["Alfa", "Beta"], "ultimo": r["erros"][0]}]
+        assert [x["escritorio"] for x in web.get("/admin/erros?escritorio=b", headers=chefe).get_json()["erros"]] == ["b"]
+    porteiro.escritorio_novo.gravar(porteiro.ARQUIVO_ESCRITORIOS, {"escritorios": {
+        "a": {"nome": "Alfa", "porta": 1, "emails": ["ana@x.com"]}}, "admins": []})
+    assert web.get("/admin/erros", headers=chave(web, "ana@x.com")).status_code == 403
+
+
 def test_criar_senha_pelo_link_do_email():
     """O link do e-mail do Firebase aponta para /nova-senha do próprio robô (a página do Firebase vinha sem a chave)."""
     web = porteiro.app.test_client()

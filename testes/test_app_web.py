@@ -151,6 +151,48 @@ def test_link_do_autenticador():
     app_web.robo.parar = False
 
 
+def test_erros_para_o_administrador():
+    """/api/erros: paradas, pausas, pulados e o que o robô resolveu sozinho, do mais novo ao mais antigo; cadastro
+    pronto e Parar não entram. Parada fora de um cliente (login) vai para o histórico com a foto."""
+    import datetime as dt
+    tmp = tempfile.mkdtemp()
+    os.makedirs(os.path.join(tmp, "erros"))
+    open(os.path.join(tmp, "erros", "f1.html"), "w").close()
+    agora = dt.datetime.now()
+    q = lambda horas: (agora - dt.timedelta(hours=horas)).strftime("%Y-%m-%dT%H:%M:%S")
+    eventos = [{"tipo": "cadastro", "quando": q(1), "cliente": "Ana [X]", "resultado": "pronto"},
+               {"tipo": "cadastro", "quando": q(2), "cliente": "Bia", "resultado": "erro", "msg": "Tempo esgotado (30 s)"},
+               {"tipo": "cadastro", "quando": q(3), "cliente": "Caio", "resultado": "pulado", "msg": "anexo recusado"},
+               {"tipo": "cadastro", "quando": q(3), "cliente": "Dani", "resultado": "parado"},
+               {"tipo": "pausa", "quando": q(4), "cliente": "Caio", "etapa": "Partes", "problema": "não consegui vincular",
+                "foto": "f1.png", "resposta": "pular"},
+               {"tipo": "sozinho", "quando": q(5), "cliente": "Eva", "etapa": "Assuntos", "problema": "net::ERR", "vezes": 1},
+               {"tipo": "pausa", "quando": q(24 * 10), "cliente": "Velho", "problema": "antigo"}]
+    with open(os.path.join(tmp, "historico.jsonl"), "w", encoding="utf-8") as f:
+        f.write("\n".join(json.dumps(e) for e in eventos) + "\n")
+    web = app_web.app.test_client()
+    with mock.patch.multiple(robo, DADOS=tmp, ARQUIVO_HISTORICO=os.path.join(tmp, "historico.jsonl")):
+        r = web.get("/api/erros?dias=7").get_json()["erros"]
+        assert [(x["cliente"], x["desfecho"]) for x in r] == [("Bia", "parou com erro"), ("Caio", "pulado"),
+                                                              ("Caio", "pausou"), ("Eva", "resolveu sozinho")]
+        assert r[2]["foto"] == "f1.png" and r[2]["pagina"] == "f1.html" and r[2]["grupo"] == "Não vinculou a parte"
+        assert r[2]["resposta"] == "pular" and r[0]["grupo"] == "PJe lento ou fora do ar"
+        assert len(web.get("/api/erros?dias=30").get_json()["erros"]) == 5 and web.get("/api/erros?dias=x").status_code == 200
+        assert web.get("/api/pagina-salva/f1.html").headers["Content-Disposition"].startswith("attachment")
+        assert web.get("/api/pagina-salva/..%2Fhistorico.jsonl").status_code == 404
+        # parada no login: entra no histórico (com a foto, se der); Parar não entra
+        with mock.patch.object(robo, "guardar_tela", lambda n, e: os.path.join(tmp, "erros", "login.png")), \
+             mock.patch.dict(app_web.estado, {"tarefa": "cadastro", "atual": ""}):
+            app_web.anotar_parada("Não consegui abrir o Chrome/PJe (TargetClosedError)")
+            robo.parar = True
+            app_web.anotar_parada("parado pela pessoa")
+            robo.parar = False
+        r = web.get("/api/erros?dias=1").get_json()["erros"][0]
+        assert r["desfecho"] == "parou com erro" and r["foto"] == "login.png" and r["etapa"] == "cadastro"
+        assert r["grupo"] == "Chrome do robô não abriu"
+        assert not any("parado pela pessoa" in x["problema"] for x in web.get("/api/erros").get_json()["erros"])
+
+
 def test_ler_qr_do_autenticador():
     """A imagem do QR vira a chave para o campo (não grava nada) e o código de agora, para conferir no celular."""
     import io

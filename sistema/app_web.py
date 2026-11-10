@@ -130,8 +130,10 @@ def trabalhador():
             alvo(*args)
         except SystemExit as e:
             robo.log(f"Parou: {e}")
+            anotar_parada(str(e))
         except Exception as e:
             robo.log(f"ERRO: {robo.resumo(e)}")
+            anotar_parada(robo.resumo(e))
         finally:
             estado["tarefa"], estado["atual"], robo.parar = "", "", False
             if robo.SERVIDOR and tarefas.empty():  # libera a memória do Chrome para os outros escritórios
@@ -160,6 +162,15 @@ def abrir_pje():
     except Exception as e:
         raise SystemExit(f"Não consegui abrir o Chrome/PJe ({robo.resumo(e)}). Se houver um Chrome do robô aberto de "
                          "antes, feche-o e tente de novo.")
+
+
+def anotar_parada(msg):
+    """O robô parou fora de um cliente (login, Chrome, autenticador, leitura do PJe): vai para o histórico, com a
+    foto da tela se o Chrome estiver aberto, para a aba Erros do administrador. Clicar em Parar não é erro."""
+    if robo.parar:
+        return
+    foto = robo.guardar_tela(estado["atual"] or "robô", estado["tarefa"] or "tarefa")
+    robo.anotar("parada", tarefa=estado["tarefa"], cliente=estado["atual"], problema=msg, foto=os.path.basename(foto or ""))
 
 
 def anotar_cadastro(nome, inicio, resultado, msg=""):
@@ -631,6 +642,8 @@ def responder():
 # ---------- relatório ----------
 
 TIPOS_DE_PROBLEMA = [  # (nome no relatório, trecho da mensagem) - vale o 1º que aparecer; nenhum = "Outros"
+    ("Chrome do robô não abriu", r"não consegui abrir o chrome"),
+    ("Código do autenticador", r"autenticador|base32|código .*recus"),
     ("Login do PJe", r"login"),
     ("Rascunho não criado", r"número do rascunho"),
     ("CPF não confere com a Receita", r"o cpf .* é de '"),
@@ -725,6 +738,47 @@ def foto(nome):
     if not nome.endswith(".png") or not os.path.exists(caminho):
         abort(404, "Foto não encontrada.")
     return send_file(caminho)
+
+
+@app.get("/api/pagina-salva/<nome>")
+def pagina_salva(nome):
+    """A página do PJe salva junto com a foto da pausa (para investigar o erro). Vai como arquivo para baixar, nunca
+    aberta aqui: é HTML do PJe."""
+    caminho = os.path.join(robo.DADOS, "erros", os.path.basename(nome))
+    if not nome.endswith(".html") or not os.path.exists(caminho):
+        abort(404, "Página salva não encontrada.")
+    return send_file(caminho, mimetype="application/octet-stream", as_attachment=True, download_name=os.path.basename(nome))
+
+
+# o que conta como problema na aba Erros do administrador (o "sozinho" é engasgo que o robô resolveu)
+DESFECHO = {"parada": "parou com erro", "pausa": "pausou", "sozinho": "resolveu sozinho"}
+
+
+@app.get("/api/erros")
+def erros_recentes():
+    """Os problemas dos últimos dias (máx. 90), do mais novo ao mais antigo, para a aba Erros do administrador (o
+    porteiro junta os de todos os escritórios)."""
+    dias = min(max(int(request.args.get("dias", "7")) if request.args.get("dias", "7").isdigit() else 7, 1), 90)
+    desde = (datetime.datetime.now() - datetime.timedelta(days=dias)).strftime("%Y-%m-%dT%H:%M:%S")
+    lista = []
+    for e in ler_historico():
+        if e["quando"] < desde:
+            continue
+        if e.get("tipo") in DESFECHO:
+            desfecho = DESFECHO[e["tipo"]]
+        elif e.get("tipo") == "cadastro" and e.get("resultado") in ("erro", "pulado"):
+            desfecho = "parou com erro" if e["resultado"] == "erro" else "pulado"
+        else:
+            continue
+        problema = e.get("problema") or e.get("msg") or ""
+        foto_ = e.get("foto") or ""
+        html = foto_[:-4] + ".html" if foto_.endswith(".png") else ""
+        lista.append({"quando": e["quando"], "desfecho": desfecho, "cliente": e.get("cliente") or "",
+                      "etapa": e.get("etapa") or e.get("tarefa") or "", "problema": problema,
+                      "grupo": tipo_do_problema(problema), "foto": foto_, "resposta": e.get("resposta") or "",
+                      "pagina": html if html and os.path.exists(os.path.join(robo.DADOS, "erros", html)) else ""})
+    lista.sort(key=lambda x: x["quando"], reverse=True)
+    return jsonify(erros=lista[:500])
 
 
 if __name__ == "__main__":

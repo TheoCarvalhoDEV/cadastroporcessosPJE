@@ -423,6 +423,48 @@ def admin_emails(id_):
     return jsonify(ok=True)
 
 
+def erros_do_robo(porta, dias):
+    """Os problemas recentes de um escritório (/api/erros do robô dele); None se o robô estiver fora do ar."""
+    try:
+        conexao = http.client.HTTPConnection("127.0.0.1", porta, timeout=10)
+        conexao.request("GET", f"/api/erros?dias={dias}")
+        resposta = conexao.getresponse()
+        dados = json.loads(resposta.read()) if resposta.status == 200 else None
+        conexao.close()
+        return dados["erros"] if dados else None
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+@app.get("/admin/erros")
+def admin_erros():
+    """Os problemas de todos os escritórios juntos (ou de um, ?escritorio=), do mais novo ao mais antigo, e os tipos
+    que mais se repetem. Escritório com o robô fora do ar aparece em 'sem_resposta'."""
+    admin_da_sessao()
+    dias = request.args.get("dias", "7")
+    dias = min(max(int(dias), 1), 90) if dias.isdigit() else 7
+    so = request.args.get("escritorio", "")
+    lista, sem_resposta = [], []
+    for id_, e in ler_escritorios()["escritorios"].items():
+        if so and id_ != so:
+            continue
+        erros = erros_do_robo(e["porta"], dias)
+        if erros is None:
+            sem_resposta.append(e["nome"])
+            continue
+        lista += [{**x, "escritorio": id_, "escritorio_nome": e["nome"]} for x in erros]
+    lista.sort(key=lambda x: x["quando"], reverse=True)
+    grupos = {}
+    for x in lista:
+        if x["desfecho"] == "resolveu sozinho":
+            continue  # o ranking é do que precisou de alguém (ou parou)
+        g = grupos.setdefault(x["grupo"], {"grupo": x["grupo"], "vezes": 0, "escritorios": set(), "ultimo": x})
+        g["vezes"] += 1
+        g["escritorios"].add(x["escritorio_nome"])
+    ranking = sorted(({**g, "escritorios": sorted(g["escritorios"])} for g in grupos.values()), key=lambda g: -g["vezes"])
+    return jsonify(erros=lista[:1000], ranking=ranking, sem_resposta=sem_resposta, dias=dias)
+
+
 @app.get("/admin/registro")
 def admin_registro():
     """As últimas 100 ações de administrador, da mais nova para a mais antiga."""

@@ -157,6 +157,12 @@
   /* ---------- administrador do Autus: todos os escritórios ---------- */
   .admin { padding: 24px clamp(16px, 3vw, 32px) 48px; display: flex; flex-direction: column; gap: 16px; }
   .admin .rel-topo .botao { margin-left: auto; }
+  .admin .rel-topo .periodos { margin-left: 0; }
+  .filtros-erros { display: flex; gap: 12px 16px; align-items: center; flex-wrap: wrap; }
+  .filtros-erros select { width: auto; min-width: 220px; height: 36px; }
+  .filtros-erros label { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--tinta-2); cursor: pointer; }
+  details.problema .quando { font-size: 12px; color: var(--tinta-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  details.problema .detalhe .linha { display: flex; gap: 8px; flex-wrap: wrap; }
   #admin-conteudo { display: flex; flex-direction: column; gap: 16px; }
   .esc-topo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .esc-topo h2 { font: 800 18px var(--titulo); }
@@ -565,7 +571,11 @@
 
 <main id="tela-admin" class="admin" hidden>
   <div class="rel-topo">
-    <h1>Escritórios</h1>
+    <h1 id="admin-titulo">Escritórios</h1>
+    <div class="periodos" id="admin-vistas" role="group" aria-label="O que ver">
+      <button type="button" data-vista="escritorios" aria-pressed="true">Escritórios</button>
+      <button type="button" data-vista="erros" aria-pressed="false">Erros</button>
+    </div>
     <button class="botao principal" id="novo-escritorio" type="button">Escritório novo</button>
   </div>
   <div id="admin-conteudo"></div>
@@ -659,12 +669,24 @@ async function enviarArquivo(url, corpo, sinal) {
   return dados;
 }
 // foto de pausa: com sessão, <img src> não leva a chave; busca com ela e mostra a cópia local (blob)
+// (escritorio: o administrador vê a foto de qualquer escritório na aba Erros, sem abrir o escritório)
 const fotosBuscadas = new Map();
-async function mostrarFoto(img, nome) {
+const comSessaoEm = escritorio => escritorio ? { ...comSessao(), "X-Escritorio": escritorio } : comSessao();
+async function mostrarFoto(img, nome, escritorio = "") {
   if (!sessao) return img.src = "/api/foto/" + encodeURIComponent(nome);
-  if (!fotosBuscadas.has(nome)) fotosBuscadas.set(nome, fetch(API + "/api/foto/" + encodeURIComponent(nome), { headers: comSessao() })
+  const chaveFoto = escritorio + "/" + nome;
+  if (!fotosBuscadas.has(chaveFoto)) fotosBuscadas.set(chaveFoto, fetch(API + "/api/foto/" + encodeURIComponent(nome), { headers: comSessaoEm(escritorio) })
     .then(r => { if (!r.ok) throw new Error(); return r.blob(); }).then(b => URL.createObjectURL(b)));
-  try { img.src = await fotosBuscadas.get(nome); } catch (e) { fotosBuscadas.delete(nome); img.remove(); }
+  try { img.src = await fotosBuscadas.get(chaveFoto); } catch (e) { fotosBuscadas.delete(chaveFoto); img.remove(); }
+}
+// a página do PJe salva com a foto: baixa como arquivo (não abre aqui: é HTML do PJe)
+async function baixarPaginaSalva(nome, escritorio) {
+  try {
+    const r = await fetch(API + "/api/pagina-salva/" + encodeURIComponent(nome), { headers: comSessaoEm(escritorio) });
+    if (!r.ok) throw new Error("A página salva não está mais no servidor (passou de 30 dias?).");
+    const link = h("a", { href: URL.createObjectURL(await r.blob()), download: nome });
+    document.body.append(link); link.click(); link.remove();
+  } catch (e) { avisar(e.message); }
 }
 
 async function api(url, corpo, segundos = 30) {
@@ -1630,10 +1652,81 @@ async function abrirEscritorio(id) {
 }
 const SITUACAO_ROBO = { parado: ["info", "Robô parado"], trabalhando: ["ok", "Trabalhando"],
   pausado: ["alerta", "Pausado, esperando alguém"], "fora do ar": ["erro", "Robô fora do ar"] };
-async function desenharAdmin() {
+let vistaAdmin = "escritorios", escritoriosAdmin = [];
+for (const b of document.querySelectorAll("#admin-vistas button")) b.addEventListener("click", () => {
+  vistaAdmin = b.dataset.vista;
+  desenharAdmin();
+});
+function desenharAdmin() {
+  for (const b of document.querySelectorAll("#admin-vistas button")) b.setAttribute("aria-pressed", String(b.dataset.vista === vistaAdmin));
+  $("#admin-titulo").textContent = vistaAdmin === "erros" ? "Erros" : "Escritórios";
+  $("#novo-escritorio").hidden = vistaAdmin === "erros";
+  return vistaAdmin === "erros" ? desenharErros() : desenharEscritorios();
+}
+
+// ---------- administrador: erros de todos os escritórios ----------
+const filtroErros = { dias: 7, escritorio: "", sozinho: false, grupo: "" };
+const DESFECHO_COR = { "parou com erro": "erro", pulado: "erro", pausou: "alerta", "resolveu sozinho": "info" };
+async function desenharErros() {
+  const caixa = $("#admin-conteudo");
+  if (!escritoriosAdmin.length) { try { escritoriosAdmin = (await api("/admin/escritorios")).escritorios; } catch (e) {} }
+  const f = filtroErros;
+  const periodo = h("div", { class: "periodos", role: "group", "aria-label": "Período" },
+    [[1, "Hoje"], [7, "7 dias"], [30, "30 dias"], [90, "90 dias"]].map(([d, t]) =>
+      h("button", { type: "button", "aria-pressed": String(f.dias === d), onclick: () => { f.dias = d; desenharErros(); } }, t)));
+  const qual = h("select", { "aria-label": "Escritório", onchange: ev => { f.escritorio = ev.target.value; desenharErros(); } },
+    h("option", { value: "" }, "Todos os escritórios"), escritoriosAdmin.map(e => h("option", { value: e.id }, e.nome)));
+  qual.value = f.escritorio;
+  const sozinho = h("input", { type: "checkbox", checked: f.sozinho, onchange: ev => { f.sozinho = ev.target.checked; desenharErros(); } });
+  const filtros = h("div", { class: "filtros-erros" }, periodo, qual, h("label", {}, sozinho, "Mostrar o que o robô resolveu sozinho"));
+  encher(caixa, filtros, h("div", { class: "cartao rel-bloco dica" }, "Juntando os erros dos escritórios..."));
+  let r;
+  try { r = await api(`/admin/erros?dias=${f.dias}&escritorio=${encodeURIComponent(f.escritorio)}`, undefined, 60); }
+  catch (e) { return encher(caixa, filtros, h("div", { class: "aviso erro" }, icone("erro"), h("p", {}, e.message))); }
+  const conta = d => r.erros.filter(x => d.includes(x.desfecho)).length;
+  const numero = (rotulo, valor, sub) => h("section", { class: "cartao numero" }, h("div", { class: "rot" }, rotulo),
+    h("div", { class: "val" }, valor), h("div", { class: "sub" }, sub));
+  const numeros = h("div", { class: "numeros" },
+    numero("Pararam com erro", conta(["parou com erro"]), "o robô não conseguiu seguir"),
+    numero("Pulados", conta(["pulado"]), "alguém mandou pular o cliente"),
+    numero("Pausas", conta(["pausou"]), "pediram ajuda a uma pessoa"),
+    numero("Resolvidos sozinho", conta(["resolveu sozinho"]), "engasgos que o robô venceu"));
+  const ranking = h("section", { class: "cartao rel-bloco" }, h("h2", {}, "O que mais se repete"),
+    h("p", { class: "intro" }, "Sem contar o que o robô resolveu sozinho. Clique para ver só esses erros na lista."),
+    r.ranking.length ? h("div", { class: "problemas" }, r.ranking.map(g => h("details", { class: "problema", ontoggle: ev => {
+        if (ev.target.open) { f.grupo = g.grupo; desenharErros(); } } },
+      h("summary", {}, h("span", { class: "seta" }, icone("voltar", 16)),
+        h("div", { class: "textos" }, h("strong", {}, g.grupo), h("div", { class: "sub" }, `${g.escritorios.join(", ")} · último: ${g.ultimo.problema.slice(0, 120)}`)),
+        h("span", { class: "vezes" }, g.vezes)))))
+      : h("p", { class: "dica" }, "Nada que tenha parado o robô neste período."));
+  const lista = r.erros.filter(x => (f.sozinho || x.desfecho !== "resolveu sozinho") && (!f.grupo || x.grupo === f.grupo));
+  const linha = x => {
+    const img = x.foto ? h("img", { alt: "Tela do PJe na hora do problema", title: "Abrir a foto inteira", onclick: ev => window.open(ev.target.src) }) : null;
+    return h("details", { class: "problema", ontoggle: ev => { if (ev.target.open && img && !img.getAttribute("src")) mostrarFoto(img, x.foto, x.escritorio); } },
+      h("summary", {}, h("span", { class: "seta" }, icone("voltar", 16)),
+        h("span", { class: "pilula " + (DESFECHO_COR[x.desfecho] || "info") }, x.desfecho),
+        h("div", { class: "textos" }, h("strong", {}, `${x.escritorio_nome}${x.cliente ? " · " + soNome(x.cliente) : ""}`),
+          h("div", { class: "sub" }, `${x.etapa ? x.etapa + " · " : ""}${x.problema.slice(0, 140)}`)),
+        h("span", { class: "quando" }, dataCurta(x.quando))),
+      h("div", { class: "detalhe" },
+        h("p", {}, x.problema || "Sem mensagem."),
+        h("p", { class: "dica" }, [`Tipo: ${x.grupo}`, x.cliente && `Cliente: ${x.cliente}`, x.resposta && `Resposta na pausa: ${x.resposta}`].filter(Boolean).join(" · ")),
+        img, x.pagina ? h("div", { class: "linha" }, h("button", { class: "botao", type: "button", onclick: () => baixarPaginaSalva(x.pagina, x.escritorio) }, "Baixar a página do PJe")) : null));
+  };
+  encher(caixa, filtros,
+    r.sem_resposta.length ? h("div", { class: "aviso alerta" }, icone("alerta"), h("p", {}, `Sem resposta do robô de: ${r.sem_resposta.join(", ")}. Os erros desses escritórios não entraram.`)) : null,
+    numeros, ranking,
+    h("section", { class: "cartao rel-bloco" },
+      h("div", { class: "esc-topo" }, h("h2", {}, f.grupo ? `Erros: ${f.grupo}` : "Todos os erros"),
+        f.grupo ? h("button", { class: "botao", type: "button", onclick: () => { f.grupo = ""; desenharErros(); } }, "Ver todos") : null),
+      h("p", { class: "intro" }, `${vezes(lista.length, "registro", "registros")}, do mais novo ao mais antigo. Clique para ver a mensagem inteira e a tela do PJe.`),
+      lista.length ? h("div", { class: "problemas" }, lista.slice(0, 300).map(linha)) : h("p", { class: "dica" }, "Nenhum erro neste período.")));
+}
+
+async function desenharEscritorios() {
   const caixa = $("#admin-conteudo");
   let r;
-  try { r = await api("/admin/escritorios"); } catch (e) { return encher(caixa, h("div", { class: "aviso erro" }, icone("erro"), h("p", {}, e.message))); }
+  try { r = await api("/admin/escritorios"); escritoriosAdmin = r.escritorios; } catch (e) { return encher(caixa, h("div", { class: "aviso erro" }, icone("erro"), h("p", {}, e.message))); }
   const cartao = e => {
     const [cor, texto] = SITUACAO_ROBO[e.robo] || ["info", e.robo];
     const novo = h("input", { type: "text", placeholder: "e-mail (ou vários, separados por vírgula)", "aria-label": `Liberar e-mail no escritório ${e.nome}` });
