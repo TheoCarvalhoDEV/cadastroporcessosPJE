@@ -40,6 +40,8 @@ def test_configuracao_e_correcao():
             corpo = {k: v for k, v in cfg.items() if k not in ("campos", "pessoas", "pje")}
             r = web.post("/api/escritorio", json={**corpo, "pje": {"cpf": "111.444.777-00"}})
             assert r.status_code == 400 and "CPF" in r.get_json()["erro"]
+            r = web.post("/api/escritorio", json={**corpo, "pje": {"totp_key": "ABC1 DEFG"}})  # '1' não é base32
+            assert r.status_code == 400 and "I por 1" in r.get_json()["erro"]
             r = web.post("/api/escritorio", json={**corpo, "dicionario": [{"frases": [], "assunto": "10433"}], "pje": {}})
             assert r.status_code == 400 and "dicionário" in r.get_json()["erro"]
             corpo.update(dicionario=[{"frases": ["dano moral"], "assunto": "10433 - Dano Moral", "materia": "DIREITO CIVIL"}],

@@ -301,6 +301,10 @@ def salvar_escritorio():
     novo = request.get_json()
     pje = novo.pop("pje", {})
     erros = []
+    if pje.get("totp_key"):
+        pje["totp_key"] = robo.limpar_chave(pje["totp_key"])
+        if not pje["totp_key"]:
+            erros.append(robo.CHAVE_INVALIDA)
     if robo.SERVIDOR:
         novo.pop("pasta_clientes", None)  # no servidor a pasta é fixa (raiz())
     elif not os.path.isdir(novo.get("pasta_clientes", "")):

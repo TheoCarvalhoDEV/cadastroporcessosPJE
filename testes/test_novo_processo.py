@@ -702,6 +702,46 @@ def test_navegador_reabre_quando_a_janela_foi_fechada():
         assert robo.navegador() is novo
 
 
+def test_limpar_chave():
+    assert robo.limpar_chave("jbsw y3dp-ehpk 3pxp") == "JBSWY3DPEHPK3PXP"  # copiada da tela, em grupos de 4
+    assert robo.limpar_chave("JBSW1Y3DP") == ""  # '1' não existe em base32 (era um I ou L)
+    assert robo.limpar_chave("") == ""
+
+
+def test_login_com_chave_invalida_explica():
+    pagina = mock.Mock()
+    with mock.patch.multiple(robo, ler_config=lambda: {"cpf": "1", "senha": "s", "totp_key": "ABC1 DEFG"},
+                             logado=lambda d: False, cpf_e_senha=lambda d, c: "codigo", saida=lambda linha: None):
+        try:
+            robo.entrar(pagina)
+            assert False, "devia ter parado"
+        except SystemExit as e:
+            assert "I por 1" in str(e)
+
+
+def test_navegador_reaproveita_o_chrome_quando_o_login_parou():
+    """Login parou com o Chrome aberto (perfil travado): a próxima tentativa usa o mesmo Chrome, não abre outro."""
+    pagina = mock.Mock(is_closed=lambda: False)
+    abertos = []
+
+    def abrir():
+        abertos.append(pagina)
+        return pagina
+
+    def entrar_falha(d):
+        sys.exit("O PJe recusou o código do autenticador")
+    with mock.patch.multiple(robo, navegador_atual=None, abrir_navegador=abrir, entrar=entrar_falha,
+                             saida=lambda linha: None):
+        try:
+            robo.navegador()
+            assert False, "devia ter parado no login"
+        except SystemExit:
+            pass
+        with mock.patch.object(robo, "entrar", lambda d: d):
+            assert robo.navegador() is pagina
+    assert len(abertos) == 1
+
+
 def test_documentos_parciais_continua_de_onde_parou():
     anexos = [f"DOC {n:02d}].pdf" for n in range(1, 16)]
     enviados = []

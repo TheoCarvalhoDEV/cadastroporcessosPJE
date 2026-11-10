@@ -701,6 +701,21 @@ NOVO_AUTENTICADOR = "#kc-totp-settings-form"  # página do QR: o PJe quer um aut
 CONFIGURE_NO_ROBO = "Em Configurações > Login do PJe, clique em 'Configurar o código pelo robô'."
 
 
+def limpar_chave(chave):
+    """A chave do autenticador sem espaços e hífens, em maiúsculas (a tela mostra a chave em grupos de 4; quem copia
+    de lá traz os espaços). '' se não for uma chave base32 válida (só A-Z e 2-7: um '1' costuma ser um I ou L)."""
+    chave = re.sub(r"[\s-]", "", chave or "").upper().rstrip("=")
+    try:
+        base64.b32decode(chave + "=" * (-len(chave) % 8))
+    except ValueError:  # binascii.Error
+        return ""
+    return chave
+
+
+CHAVE_INVALIDA = ("a chave do autenticador está errada: ela só tem letras de A a Z e números de 2 a 7 (confira se "
+                  "não trocou I por 1, O por 0 ou B por 8)")
+
+
 def mensagens_da_tela(d):
     return " ".join(e.inner_text().strip() for e in d.query_selector_all(ERRO_LOGIN) if e.inner_text().strip())
 
@@ -763,7 +778,11 @@ def entrar(d):
     if tela == "codigo":
         if not config.get("totp_key"):
             sys.exit("Falta a chave do autenticador do PJe. " + CONFIGURE_NO_ROBO)
-        visivel(d, "#otp").fill(pyotp.TOTP(config["totp_key"]).now())
+        chave = limpar_chave(config["totp_key"])
+        if not chave:
+            sys.exit(f"{CHAVE_INVALIDA[0].upper()}{CHAVE_INVALIDA[1:]}. Cole de novo em Configurações > Login do PJe "
+                     "ou clique em 'Configurar o código pelo robô'.")
+        visivel(d, "#otp").fill(pyotp.TOTP(chave).now())
         visivel(d, "xpath=//input[@type='submit' or @value='VALIDAR' or @value='Validar']").click()
         try:
             esperar_ate(lambda: logado(d) or mensagens_da_tela(d), 40)
@@ -869,8 +888,10 @@ def navegador(logar=True):
         except Exception:
             pass
     log("Abrindo o Chrome do robô...")
-    navegador_atual = entrar(abrir_navegador()) if logar else abrir_navegador()
-    return navegador_atual
+    # guarda a página ANTES do login: se o login parar (senha errada, código recusado...), o Chrome continua aberto
+    # com o perfil travado, e a próxima tentativa tem de reaproveitá-lo em vez de abrir outro (que falharia)
+    navegador_atual = abrir_navegador()
+    return entrar(navegador_atual) if logar else navegador_atual
 
 
 def fechar_navegador():
