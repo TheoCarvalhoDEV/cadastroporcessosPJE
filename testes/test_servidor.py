@@ -67,6 +67,43 @@ def test_uv_nao_le_configuracao_de_quem_rodou():
         assert linhas and all("--no-config" in l for l in linhas), (nome, linhas)
 
 
+def test_administrador_e_retirar_emails():
+    arquivo = os.path.join(tempfile.mkdtemp(), "escritorios.json")
+    escritorio_novo.adicionar(arquivo, "jvo", "JVO", ["a@jvo.adv.br", "b@jvo.adv.br"])
+    escritorio_novo.retirar(arquivo, "jvo", ["A@jvo.adv.br"])
+    assert escritorio_novo.adicionar_admin(arquivo, " Chefe@X.com ") == "chefe@x.com"
+    escritorio_novo.adicionar_admin(arquivo, "chefe@x.com")  # de novo não repete
+    dados = escritorio_novo.ler(arquivo)
+    assert dados["escritorios"]["jvo"]["emails"] == ["b@jvo.adv.br"] and dados["admins"] == ["chefe@x.com"]
+    escritorio_novo.adicionar(arquivo, "jvo", "", ["c@jvo.adv.br"])  # mais e-mails mantêm a lista de admins
+    assert escritorio_novo.ler(arquivo)["admins"] == ["chefe@x.com"]
+    for chamada in (lambda: escritorio_novo.adicionar_admin(arquivo, "semarroba"),
+                    lambda: escritorio_novo.adicionar(arquivo, "novo", "", ["x@y.com"]),  # escritório novo sem nome
+                    lambda: escritorio_novo.retirar(arquivo, "naoexiste", ["x@y.com"])):
+        try:
+            chamada()
+            assert False
+        except SystemExit:
+            pass
+
+
+def test_ligar_escritorio_confere_o_que_recebe():
+    """O comando que roda como root (pelo sudo do porteiro) recusa identificador e porta estranhos antes de tudo, e o
+    atualizar.sh instala uma cópia com dono root e a regra do sudo conferida pelo visudo."""
+    import shutil
+    import subprocess
+    pasta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "servidor")
+    bash = shutil.which("bash")
+    if bash:
+        for args in (["../etc", "8801"], ["ok", "22"], ["ok", "8800"], ["ok", "8801; rm -rf /"], ["UPPER", "8801"], []):
+            r = subprocess.run([bash, os.path.join(pasta, "ligar_escritorio.sh"), *args], capture_output=True, text=True)
+            assert r.returncode == 2, (args, r.stdout, r.stderr)
+    with open(os.path.join(pasta, "atualizar.sh"), encoding="utf-8") as f:
+        atualizar = f.read()
+    assert "install -o root -g root -m 755 $RAIZ/codigo/servidor/ligar_escritorio.sh /usr/local/sbin/autus-ligar-escritorio" in atualizar
+    assert "visudo -cqf /etc/sudoers.d/autus.novo && mv" in atualizar
+
+
 def test_publicar_pagina_no_firebase_hosting():
     """A página vai para o Firebase com o endereço do servidor, as regras de segurança e só os arquivos que mudaram;
     e o atualizar.sh publica ANTES de reiniciar o porteiro (que passa a mandar o endereço do servidor para lá)."""

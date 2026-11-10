@@ -14,6 +14,11 @@ sudo -u robo env UV_PYTHON_INSTALL_DIR=/opt/uv-python uv pip install --no-config
 cp $RAIZ/codigo/servidor/robo@.service $RAIZ/codigo/servidor/porteiro.service $RAIZ/codigo/servidor/limpar.service \
    $RAIZ/codigo/servidor/limpar.timer /etc/systemd/system/
 systemctl daemon-reload
+# administrador cria escritório pela página: o porteiro (robo) só pode rodar esta cópia com dono root, via sudo
+install -o root -g root -m 755 $RAIZ/codigo/servidor/ligar_escritorio.sh /usr/local/sbin/autus-ligar-escritorio
+echo 'robo ALL=(root) NOPASSWD: /usr/local/sbin/autus-ligar-escritorio' > /etc/sudoers.d/autus.novo
+chmod 440 /etc/sudoers.d/autus.novo
+visudo -cqf /etc/sudoers.d/autus.novo && mv /etc/sudoers.d/autus.novo /etc/sudoers.d/autus
 
 # ponytail: uma tarefa pode começar entre a conferência e o reinício; aceitável com poucos escritórios
 for env in $RAIZ/escritorios/*/robo.env; do

@@ -154,6 +154,28 @@
   body.entrando { padding-left: 0; }
   body.entrando .rail, body.entrando .topo { display: none; }
   .entrar { min-height: 90vh; display: grid; place-items: center; padding: 16px; }
+  /* ---------- administrador do Autus: todos os escritórios ---------- */
+  .admin { padding: 24px clamp(16px, 3vw, 32px) 48px; display: flex; flex-direction: column; gap: 16px; }
+  .admin .rel-topo .botao { margin-left: auto; }
+  #admin-conteudo { display: flex; flex-direction: column; gap: 16px; }
+  .esc-topo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .esc-topo h2 { font: 800 18px var(--titulo); }
+  .esc-topo .sub { font-size: 12px; color: var(--tinta-3); }
+  .esc-topo .botao { margin-left: auto; }
+  .emails { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .emails .chip button { border: 0; background: none; padding: 0 0 0 2px; font-size: 16px; line-height: 1; color: var(--tinta-3); cursor: pointer; }
+  .emails .chip button:hover { color: var(--erro); }
+  .form-adm { display: flex; gap: 8px; flex-wrap: wrap; }
+  .form-adm input { flex: 1; min-width: 220px; }
+  #form-novo textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--borda); border-radius: 12px; background: var(--superficie);
+    color: var(--tinta); font-size: 14px; resize: vertical; }
+  #form-novo textarea:focus { outline: 3px solid var(--cor-media); border-color: var(--cor); }
+  .registro-adm { font-size: 13px; }
+  .registro-adm summary { cursor: pointer; font-weight: 700; }
+  .registro-adm ol { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; color: var(--tinta-2); }
+  .faixa-admin { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px clamp(16px, 3vw, 32px);
+    background: var(--alerta-fundo); color: var(--alerta); font-size: 13px; font-weight: 600; }
+  .faixa-admin .botao { height: 32px; font-size: 13px; }
   .entrar .cartao { width: min(400px, 100%); padding: 32px; display: flex; flex-direction: column; gap: 16px; }
   .entrar h1 { margin: 0; font: 800 22px var(--titulo); }
   .entrar .link { background: none; border: 0; padding: 0; color: var(--cor); font-weight: 600; cursor: pointer; text-align: left; }
@@ -480,6 +502,7 @@
   <button class="nav-item" id="ir-cadastro" type="button" aria-current="true"></button>
   <button class="nav-item" id="abrir-relatorio" type="button" aria-current="false"></button>
   <button class="nav-item" id="abrir-config" type="button" aria-current="false"></button>
+  <button class="nav-item" id="abrir-admin" type="button" aria-current="false" hidden></button>
   <span class="rail-espaco"></span>
   <button class="nav-item" id="tema" type="button" aria-label="Alternar entre modo claro e escuro" title="Modo claro / escuro">
       <svg class="sol" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
@@ -495,6 +518,7 @@
     <button class="botao" id="sair" type="button" hidden>Sair</button>
   </div>
 </header>
+<div class="faixa-admin" id="faixa-admin" role="status" hidden></div>
 
 <main id="tela-cadastro" class="cadastro">
   <aside class="lista cartao" aria-label="Clientes">
@@ -539,6 +563,14 @@
 
 <main id="tela-entrar" class="entrar" hidden></main>
 
+<main id="tela-admin" class="admin" hidden>
+  <div class="rel-topo">
+    <h1>Escritórios</h1>
+    <button class="botao principal" id="novo-escritorio" type="button">Escritório novo</button>
+  </div>
+  <div id="admin-conteudo"></div>
+</main>
+
 <main id="tela-relatorio" class="relatorio" hidden>
   <div class="rel-topo">
     <button class="voltar" id="fechar-relatorio" type="button" hidden></button>
@@ -577,6 +609,7 @@ if (location.protocol === "file:") {
   throw new Error("Página aberta como arquivo: use o Abrir cadastro.bat.");
 }
 const ICONES = {
+  predio: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1"/><path d="M14 9h1"/><path d="M9 13h1"/><path d="M14 13h1"/><path d="M10 21v-4h4v4"/>',
   pessoas: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   ajustes: '<path d="M4 6h9"/><path d="M17 6h3"/><circle cx="15" cy="6" r="2"/><path d="M4 12h3"/><path d="M11 12h9"/><circle cx="9" cy="12" r="2"/><path d="M4 18h11"/><path d="M19 18h1"/><circle cx="17" cy="18" r="2"/>',
   recarregar: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
@@ -607,7 +640,16 @@ function guardarSessao(chave) {
   sessao = chave || "";
   try { sessao ? localStorage.setItem("sessao", sessao) : localStorage.removeItem("sessao"); } catch (e) {}
 }
-const comSessao = (cabecalhos = {}) => sessao ? { ...cabecalhos, Authorization: "Bearer " + sessao } : cabecalhos;
+// administrador do Autus: o escritório que ele abriu (só nesta aba) vai em cada pedido; o porteiro confere se ele
+// é mesmo administrador (para os outros o cabeçalho não vale nada)
+let escritorioAberto = "", souAdmin = false;
+try { escritorioAberto = sessionStorage.getItem("escritorio") || ""; } catch (e) {}
+function guardarEscritorioAberto(id) {
+  escritorioAberto = id || "";
+  try { escritorioAberto ? sessionStorage.setItem("escritorio", escritorioAberto) : sessionStorage.removeItem("escritorio"); } catch (e) {}
+}
+const comSessao = (cabecalhos = {}) => !sessao ? cabecalhos
+  : { ...cabecalhos, Authorization: "Bearer " + sessao, ...(escritorioAberto ? { "X-Escritorio": escritorioAberto } : {}) };
 // pedidos com arquivo (FormData): o mesmo tratamento de erro do api()
 async function enviarArquivo(url, corpo, sinal) {
   const r = await fetch(API + url, { method: "POST", body: corpo, headers: comSessao(), signal: sinal });
@@ -638,7 +680,7 @@ async function api(url, corpo, segundos = 30) {
   } finally { clearTimeout(tempo); }
   const dados = await r.json().catch(() => ({}));
   if (r.status === 401 && dados.entrar) { guardarSessao(""); mostrarTela("entrar"); }  // servidor: sem sessão (ou ela venceu)
-  if (!r.ok) throw new Error(dados.erro || `O servidor respondeu ${r.status}.`);
+  if (!r.ok) throw Object.assign(new Error(dados.erro || `O servidor respondeu ${r.status}.`), { dados });
   return dados;
 }
 
@@ -714,6 +756,9 @@ function aplicarIdentidade() {
 $("#ir-cadastro").append(icone("pessoas", 22), h("span", {}, "Cadastro"));
 $("#abrir-relatorio").append(icone("grafico", 22), h("span", {}, "Relatório"));
 $("#abrir-config").append(icone("ajustes", 22), h("span", {}, "Ajustes"));
+$("#abrir-admin").append(icone("predio", 22), h("span", {}, "Escritórios"));
+$("#abrir-admin").addEventListener("click", () => voltarAosEscritorios());
+$("#novo-escritorio").addEventListener("click", () => formNovoEscritorio());
 $("#ir-cadastro").addEventListener("click", () => mostrarTela("cadastro"));
 $("#fechar-config").append(icone("voltar"), "Voltar ao cadastro");
 $("#fechar-relatorio").append(icone("voltar"), "Voltar ao cadastro");
@@ -727,14 +772,15 @@ $("#fechar-relatorio").addEventListener("click", () => mostrarTela("cadastro"));
 $("#status").addEventListener("click", () => { if (est.pausa) mostrarTela("cadastro"); });
 let tempoFiltro = 0;  // espera a pessoa parar de digitar antes de redesenhar a lista
 $("#filtro").addEventListener("input", ev => { const v = ev.target.value; clearTimeout(tempoFiltro); tempoFiltro = setTimeout(() => { filtro = v; desenharLista(); }, 150); });
-const TELAS = ["cadastro", "config", "relatorio", "entrar"];
+const TELAS = ["cadastro", "config", "relatorio", "entrar", "admin"];
 function mostrarTela(qual) {
   const trocou = $("#tela-" + qual).hidden;
   for (const t of TELAS) $("#tela-" + t).hidden = t !== qual;
   document.body.classList.toggle("entrando", qual === "entrar");
   if (trocou && qual === "entrar") desenharEntrar();
-  [["cadastro", "#ir-cadastro"], ["relatorio", "#abrir-relatorio"], ["config", "#abrir-config"]]
+  [["cadastro", "#ir-cadastro"], ["relatorio", "#abrir-relatorio"], ["config", "#abrir-config"], ["admin", "#abrir-admin"]]
     .forEach(([t, id]) => $(id).setAttribute("aria-current", String(t === qual)));
+  if (trocou && qual === "admin") desenharAdmin();
   if (trocou && qual === "config") desenharConfig();
   if (trocou && qual === "relatorio") carregarRelatorio();
   if (trocou) window.scrollTo(0, 0);
@@ -1555,7 +1601,106 @@ function desenharNovaSenha() {
     campo("Senha nova", senha), campo("Repita a senha", repetir), msg, botao));
   senha.focus();
 }
-$("#sair").addEventListener("click", async () => { try { await api("/sair", {}); } finally { guardarSessao(""); location.reload(); } });
+$("#sair").addEventListener("click", async () => {
+  try { await api("/sair", {}); } finally { guardarSessao(""); guardarEscritorioAberto(""); location.reload(); }
+});
+
+// ---------- administrador do Autus: tela Escritórios ----------
+// Sem escritório aberto, o administrador só vê esta tela; ao abrir um, a página recarrega já com o escritório
+// (X-Escritorio) e mostra a faixa "como administrador".
+function aplicarAdmin() {
+  $("#abrir-admin").hidden = !souAdmin;
+  const faixa = $("#faixa-admin");
+  faixa.hidden = !(souAdmin && escritorioAberto);
+  if (!faixa.hidden) encher(faixa, icone("predio", 16),
+    h("span", {}, `Você está no escritório ${(cfg && cfg.nome) || escritorioAberto} como administrador.`),
+    h("button", { class: "botao", type: "button", onclick: voltarAosEscritorios }, "Voltar aos escritórios"));
+}
+function modoSoAdmin() {  // nenhum escritório carregado: some o que é de escritório
+  souAdmin = true;
+  for (const id of ["#ir-cadastro", "#abrir-relatorio", "#abrir-config", "#status"]) $(id).hidden = true;
+  $("#sair").hidden = false;
+  $("#nome-escritorio").textContent = "Autus";
+  aplicarAdmin();
+  mostrarTela("admin");
+}
+function voltarAosEscritorios() { guardarEscritorioAberto(""); location.reload(); }
+async function abrirEscritorio(id) {
+  try { await api("/admin/abrir", { id }); guardarEscritorioAberto(id); location.reload(); } catch (e) { avisar(e.message); }
+}
+const SITUACAO_ROBO = { parado: ["info", "Robô parado"], trabalhando: ["ok", "Trabalhando"],
+  pausado: ["alerta", "Pausado, esperando alguém"], "fora do ar": ["erro", "Robô fora do ar"] };
+async function desenharAdmin() {
+  const caixa = $("#admin-conteudo");
+  let r;
+  try { r = await api("/admin/escritorios"); } catch (e) { return encher(caixa, h("div", { class: "aviso erro" }, icone("erro"), h("p", {}, e.message))); }
+  const cartao = e => {
+    const [cor, texto] = SITUACAO_ROBO[e.robo] || ["info", e.robo];
+    const novo = h("input", { type: "text", placeholder: "e-mail (ou vários, separados por vírgula)", "aria-label": `Liberar e-mail no escritório ${e.nome}` });
+    return h("section", { class: "cartao rel-bloco" },
+      h("div", { class: "esc-topo" },
+        h("div", {}, h("h2", {}, e.nome), h("div", { class: "sub mono" }, e.id)),
+        h("span", { class: "pilula " + cor }, h("span", { class: "ponto" }), texto),
+        h("button", { class: "botao principal", type: "button", onclick: () => abrirEscritorio(e.id) }, "Abrir")),
+      h("div", { class: "emails" }, e.emails.length ? e.emails.map(m => h("span", { class: "chip" }, m,
+          h("button", { type: "button", title: "Retirar o acesso", "aria-label": `Retirar ${m}`, onclick: () => retirarEmail(e, m) }, "×")))
+        : h("span", { class: "dica" }, "Nenhum e-mail liberado: ninguém do escritório entra.")),
+      h("form", { class: "form-adm", onsubmit: async ev => {
+          ev.preventDefault();
+          const emails = novo.value.split(/[\s,;]+/).filter(Boolean);
+          if (!emails.length) return;
+          try { await api("/admin/escritorios/" + encodeURIComponent(e.id) + "/emails", { adicionar: emails }, 60);
+            informar(`Liberado. O link de criar senha foi para ${emails.join(", ")}.`); desenharAdmin(); }
+          catch (x) { avisar(x.message); }
+        } }, novo, h("button", { class: "botao", type: "submit" }, "Liberar e mandar o link")));
+  };
+  const registro = h("ol", {});
+  encher(caixa, h("div", { id: "form-novo" }),
+    r.escritorios.length ? r.escritorios.map(cartao) : h("div", { class: "cartao rel-bloco dica" }, "Nenhum escritório ainda. Clique em Escritório novo."),
+    h("details", { class: "cartao rel-bloco registro-adm", ontoggle: async ev => {
+        if (!ev.target.open || registro.childElementCount) return;
+        try { const { registro: linhas } = await api("/admin/registro");
+          encher(registro, linhas.length ? linhas.map(l => h("li", {}, `${l.quando.replace("T", " ").slice(0, 16)} · ${l.email} · ${l.acao}`
+            + (l.escritorio ? ` · ${l.escritorio}` : "") + (l.emails ? ` (${l.emails.join(", ")})` : "") + (l.erro ? ` · erro: ${l.erro}` : "")))
+            : h("li", {}, "Nada registrado ainda.")); }
+        catch (x) { encher(registro, h("li", {}, x.message)); }
+      } }, h("summary", {}, "Registro do administrador (últimas 100 ações)"), registro));
+}
+async function retirarEmail(e, email) {
+  if (!confirm(`Retirar ${email} do escritório ${e.nome}? A pessoa perde o acesso na hora.`)) return;
+  try { await api("/admin/escritorios/" + encodeURIComponent(e.id) + "/emails", { retirar: [email] }); informar(`${email} não entra mais no ${e.nome}.`); desenharAdmin(); }
+  catch (x) { avisar(x.message); }
+}
+// identificador a partir do nome: "Silva & Souza Advogados" -> "silva-souza-advogados"
+const identificadorDe = nome => nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30).replace(/-+$/, "");
+function formNovoEscritorio() {
+  const caixa = $("#form-novo");
+  if (!caixa || caixa.childElementCount) return caixa && caixa.querySelector("input").focus();
+  let mexeuNoId = false;
+  const nome = h("input", { type: "text", required: true, maxlength: 80, placeholder: "ex.: Silva & Souza Advogados" });
+  const id = h("input", { type: "text", required: true, class: "mono", maxlength: 30, pattern: "[a-z0-9\\-]{2,30}",
+    title: "De 2 a 30 letras minúsculas, números ou hífen", oninput: () => mexeuNoId = true });
+  nome.addEventListener("input", () => { if (!mexeuNoId) id.value = identificadorDe(nome.value); });
+  const emails = h("textarea", { rows: 2, placeholder: "e-mails de quem vai usar, separados por vírgula ou linha" });
+  const botao = h("button", { class: "botao principal", type: "submit" }, "Criar e mandar os links");
+  encher(caixa, h("form", { class: "cartao rel-bloco", onsubmit: async ev => {
+      ev.preventDefault(); botao.disabled = true; botao.textContent = "Ligando o robô do escritório...";
+      try {
+        const lista = emails.value.split(/[\s,;]+/).filter(Boolean);
+        await api("/admin/escritorios", { id: id.value, nome: nome.value, emails: lista }, 240);
+        informar(`Escritório ${nome.value} criado.` + (lista.length ? ` O link de criar senha foi para ${lista.join(", ")}.` : ""));
+        desenharAdmin();
+      } catch (x) { avisar(x.message); botao.disabled = false; botao.textContent = "Criar e mandar os links"; }
+    } },
+    h("h2", {}, "Escritório novo"),
+    h("p", { class: "intro" }, "O robô do escritório é ligado na hora e cada e-mail recebe o link para criar a senha. Depois, alguém do escritório preenche Ajustes > Login do PJe."),
+    h("div", { class: "grade2" }, campo("Nome do escritório", nome), campo("Identificador (não muda depois)", id)),
+    h("div", { style: "margin-top:16px" }, campo("E-mails", emails)),
+    h("div", { class: "form-adm", style: "margin-top:16px" }, botao,
+      h("button", { class: "botao", type: "button", onclick: () => encher(caixa) }, "Cancelar"))));
+  nome.focus();
+}
 // arrastar pastas: lê cada pasta solta (readEntries devolve em lotes; repete até vir vazio)
 async function arquivosDoArraste(itens) {
   const lista = [];
@@ -1788,9 +1933,11 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
   try { await carregarEscritorio(); }
   catch (e) {
     if (!$("#tela-entrar").hidden) return;  // servidor sem sessão: fica na tela de entrar
+    if (e.dados && e.dados.escolher) { guardarEscritorioAberto(""); return modoSoAdmin(); }  // administrador
     avisar(e.message + " A página tenta de novo em 15 segundos.");  // ex.: o robô do escritório reiniciando
     return setTimeout(() => location.reload(), 15000);
   }
+  if (cfg.servidor) { try { souAdmin = (await api("/eu")).admin; } catch (e) {} aplicarAdmin(); }
   await Promise.all([carregarMapa(), atualizarEstado()]);  // independentes: em paralelo (#16)
   await carregarClientes();
   let consultando = false, ultima = 0;

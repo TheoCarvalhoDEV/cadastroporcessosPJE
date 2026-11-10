@@ -126,6 +126,62 @@ def test_pagina_no_firebase_hosting():
         assert web.post("/entrar", json={}, headers={"Origin": "https://mal.exemplo"}).status_code == 403
 
 
+def test_administrador():
+    """O administrador entra sem escritório, abre qualquer um (X-Escritorio), cria escritório e libera/retira e-mails;
+    quem não é administrador não consegue nada disso, nem trocando o cabeçalho. Tudo fica no registro."""
+    porteiro.escritorio_novo.gravar(porteiro.ARQUIVO_ESCRITORIOS, {
+        "escritorios": {"teste": {"nome": "Teste", "porta": servidor.server_port, "emails": ["ana@x.com"]},
+                        "outro": {"nome": "Outro", "porta": PORTA_PARADA, "emails": ["bia@x.com"]}},
+        "admins": ["chefe@x.com"]})
+    if os.path.exists(porteiro.ARQUIVO_AUDITORIA):
+        os.remove(porteiro.ARQUIVO_AUDITORIA)
+    web = porteiro.app.test_client()
+    chefe, ana = chave(web, "chefe@x.com"), chave(web, "ana@x.com")  # o administrador entra sem escritório
+    assert web.get("/eu", headers=chefe).get_json() == {"email": "chefe@x.com", "admin": True, "escritorio": None}
+    assert web.get("/eu", headers=ana).get_json()["admin"] is False
+    r = web.get("/api/eco", headers=chefe)
+    assert r.status_code == 409 and r.get_json()["escolher"] is True  # ainda não abriu um escritório
+    assert web.get("/api/eco", headers={**chefe, "X-Escritorio": "teste"}).status_code == 200
+    assert web.get("/api/eco", headers={**chefe, "X-Escritorio": "naoexiste"}).status_code == 409
+    # quem não é administrador: o cabeçalho é ignorado (continua no próprio escritório) e /admin é recusado
+    assert web.get("/api/eco", headers={**ana, "X-Escritorio": "outro"}).status_code == 200  # o "teste", que responde
+    for metodo, url in (("get", "/admin/escritorios"), ("post", "/admin/abrir"), ("post", "/admin/escritorios"),
+                        ("post", "/admin/escritorios/teste/emails"), ("get", "/admin/registro")):
+        assert getattr(web, metodo)(url, json={}, headers=ana).status_code == 403, url
+        assert getattr(web, metodo)(url, json={}).status_code == 401, url
+    lista = web.get("/admin/escritorios", headers=chefe).get_json()
+    assert [(e["id"], e["robo"]) for e in lista["escritorios"]] == [("outro", "fora do ar"), ("teste", "fora do ar")]
+    assert web.post("/admin/abrir", json={"id": "teste"}, headers=chefe).status_code == 200
+    # escritório novo: entra no arquivo, liga o robô (sudo) e manda os links
+    ligados, links = [], []
+    with mock.patch.object(porteiro.subprocess, "run", lambda cmd, **k: ligados.append(cmd)), \
+         mock.patch.object(porteiro, "mandar_links", lambda emails: links.extend(emails)):
+        r = web.post("/admin/escritorios", json={"id": "silva", "nome": "Silva & Souza", "emails": ["Caio@X.com"]}, headers=chefe)
+        assert r.status_code == 200, r.get_json()
+        assert web.post("/admin/escritorios", json={"id": "silva", "nome": "De novo"}, headers=chefe).status_code == 400
+        assert web.post("/admin/escritorios", json={"id": "Ruim!", "nome": "X"}, headers=chefe).status_code == 400
+        assert web.post("/admin/escritorios", json={"id": "novo2", "nome": "X", "emails": ["semarroba"]}, headers=chefe).status_code == 400
+        assert web.post("/admin/escritorios", json={"id": "novo3", "nome": "X", "emails": ["ana@x.com"]}, headers=chefe).status_code == 400  # e-mail de outro
+        r = web.post("/admin/escritorios/silva/emails", json={"adicionar": ["dani@x.com"], "retirar": ["caio@x.com"]}, headers=chefe)
+        assert r.status_code == 200
+    dados = porteiro.escritorio_novo.ler(porteiro.ARQUIVO_ESCRITORIOS)
+    silva = dados["escritorios"]["silva"]
+    assert silva["nome"] == "Silva & Souza" and silva["emails"] == ["dani@x.com"]
+    assert silva["porta"] == max(servidor.server_port, PORTA_PARADA, 8800) + 1
+    assert ligados == [porteiro.LIGAR_ESCRITORIO + ["silva", str(silva["porta"])]] and links == ["caio@x.com", "dani@x.com"]
+    assert dados["admins"] == ["chefe@x.com"]  # a página não muda a lista de administradores
+    # robô que não liga: avisa e fica no registro
+    def falha(cmd, **k):
+        raise porteiro.subprocess.CalledProcessError(1, cmd, stderr="systemctl falhou")
+    with mock.patch.object(porteiro.subprocess, "run", falha):
+        r = web.post("/admin/escritorios", json={"id": "quebra", "nome": "Quebra"}, headers=chefe)
+    assert r.status_code == 502 and "systemctl falhou" in r.get_json()["erro"]
+    acoes = [(l["acao"], l.get("escritorio")) for l in web.get("/admin/registro", headers=chefe).get_json()["registro"]]
+    assert acoes[0] == ("criou o escritório (robô NÃO ligou)", "quebra")
+    assert ("abriu o escritório", "teste") in acoes and ("criou o escritório", "silva") in acoes
+    assert ("retirou e-mails", "silva") in acoes and ("entrou", None) in acoes
+
+
 def test_criar_senha_pelo_link_do_email():
     """O link do e-mail do Firebase aponta para /nova-senha do próprio robô (a página do Firebase vinha sem a chave)."""
     web = porteiro.app.test_client()

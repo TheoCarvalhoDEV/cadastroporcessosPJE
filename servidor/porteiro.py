@@ -12,6 +12,7 @@ import http.client
 import json
 import os
 import secrets
+import subprocess
 import threading
 import time
 import urllib.error
@@ -19,10 +20,13 @@ import urllib.request
 from urllib.parse import quote, urlparse
 from flask import Flask, Response, abort, jsonify, redirect, request, send_file, send_from_directory
 from itsdangerous import BadSignature, URLSafeTimedSerializer
+import escritorio_novo
 
 RAIZ = os.environ.get("ROBO_RAIZ", "/srv/robo")
 ARQUIVO_ESCRITORIOS = os.path.join(RAIZ, "escritorios.json")
 ARQUIVO_ENCERRADAS = os.path.join(RAIZ, "sessoes_encerradas.json")  # quem clicou em Sair: a chave não vale mais
+ARQUIVO_AUDITORIA = os.path.join(RAIZ, "auditoria.jsonl")  # tudo o que um administrador faz (e em qual escritório)
+LIGAR_ESCRITORIO = ["sudo", "-n", "/usr/local/sbin/autus-ligar-escritorio"]  # ligar_escritorio.sh, dono root
 API_KEY = os.environ["FIREBASE_API_KEY"]
 PORTA = int(os.environ.get("ROBO_PORTA_PORTEIRO", 8800))
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sistema", "web")
@@ -40,23 +44,44 @@ app = Flask(__name__, static_folder=None)
 app.config.update(MAX_CONTENT_LENGTH=210 * 1024 * 1024)  # o robô do escritório confere os 200 MB e dá a mensagem
 assinador = URLSafeTimedSerializer(os.environ["ROBO_CHAVE_SESSAO"], salt="sessao")
 trava_encerradas = threading.Lock()
+trava_escritorios = threading.Lock()  # o administrador muda o escritorios.json pela página
 
 
 # ---------- escritórios e Firebase ----------
 
+def ler_escritorios():
+    """O escritorios.json relido a cada pedido: tirar um e-mail (ou um administrador) de lá corta o acesso na hora."""
+    return escritorio_novo.ler(ARQUIVO_ESCRITORIOS)
+
+
 def escritorio_do_email(email):
-    """{"id", "nome", "porta"} do escritório do e-mail, ou None. Relê o arquivo a cada pedido: tirar um e-mail
-    de lá corta o acesso na hora."""
-    try:
-        with open(ARQUIVO_ESCRITORIOS, encoding="utf-8") as f:
-            escritorios = json.load(f)["escritorios"]
-    except FileNotFoundError:
-        return None
+    """{"id", "nome", "porta"} do escritório do e-mail, ou None."""
     email = (email or "").strip().lower()
-    for id_, e in escritorios.items():
+    for id_, e in ler_escritorios()["escritorios"].items():
         if email in e["emails"]:
             return {"id": id_, "nome": e["nome"], "porta": e["porta"]}
     return None
+
+
+def eh_admin(email):
+    return bool(email) and email.strip().lower() in ler_escritorios().get("admins", [])
+
+
+def escritorio_do_pedido(email):
+    """O escritório deste pedido. Administrador escolhe qualquer um pelo cabeçalho X-Escritorio (a página manda o
+    que ele abriu); os outros, sempre o do próprio e-mail (o cabeçalho é ignorado)."""
+    escolhido = request.headers.get("X-Escritorio", "")
+    if escolhido and eh_admin(email):
+        e = ler_escritorios()["escritorios"].get(escolhido)
+        return {"id": escolhido, "nome": e["nome"], "porta": e["porta"]} if e else None
+    return escritorio_do_email(email)
+
+
+def auditar(email, acao, **detalhes):
+    """Uma linha por ação de administrador: quem, quando, o quê."""
+    linha = {"quando": time.strftime("%Y-%m-%dT%H:%M:%S"), "email": email, "acao": acao, **detalhes}
+    with open(ARQUIVO_AUDITORIA, "a", encoding="utf-8") as f:
+        f.write(json.dumps(linha, ensure_ascii=False) + "\n")
 
 
 def token_da_maquina():
@@ -174,7 +199,7 @@ def liberar_para_a_pagina(resposta):
     origem = request.headers.get("Origin")
     if origem in ORIGENS:
         resposta.headers.update({"Access-Control-Allow-Origin": origem, "Access-Control-Allow-Methods": "GET, POST",
-                                 "Access-Control-Allow-Headers": "Authorization, Content-Type",
+                                 "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Escritorio",
                                  "Access-Control-Max-Age": "600"})
         resposta.vary.add("Origin")
     return resposta
@@ -224,9 +249,21 @@ def entrar():
         return jsonify(erro="Não consegui falar com o serviço de login. Tente de novo em instantes."), 502
     if not certo:
         return jsonify(erro="E-mail ou senha errados."), 401
-    if not escritorio_do_email(email):
+    if not escritorio_do_email(email) and not eh_admin(email):
         return jsonify(erro="Este e-mail não está ligado a nenhum escritório."), 403
+    if eh_admin(email):
+        auditar(email, "entrou")
     return jsonify(ok=True, sessao=nova_sessao(email))
+
+
+@app.get("/eu")
+def eu():
+    """Quem está na página: administrador vê a tela de Escritórios antes de abrir um."""
+    email = (ler_sessao() or {}).get("email")
+    if not email or not (eh_admin(email) or escritorio_do_email(email)):
+        return jsonify(erro="Entre com seu e-mail e senha.", entrar=True), 401
+    proprio = escritorio_do_email(email)
+    return jsonify(email=email, admin=eh_admin(email), escritorio=proprio["id"] if proprio else None)
 
 
 @app.post("/sair")
@@ -266,10 +303,136 @@ def nova_senha():
 
 @app.route("/api/<path:resto>", methods=["GET", "POST"])
 def api(resto):
-    escritorio = escritorio_do_email((ler_sessao() or {}).get("email"))
+    email = (ler_sessao() or {}).get("email")
+    escritorio = escritorio_do_pedido(email)
     if not escritorio:
+        if eh_admin(email):  # administrador sem escritório aberto (ou um que foi apagado do arquivo)
+            return jsonify(erro="Escolha um escritório.", escolher=True), 409
         return jsonify(erro="Entre com seu e-mail e senha.", entrar=True), 401
     return repassar(escritorio["porta"])
+
+
+# ---------- administrador do Autus ----------
+
+def admin_da_sessao():
+    """O e-mail do administrador deste pedido; para (401/403) se não for."""
+    email = (ler_sessao() or {}).get("email")
+    if not email:
+        abort(Response(json.dumps({"erro": "Entre com seu e-mail e senha.", "entrar": True}), 401,
+                       content_type="application/json"))
+    if not eh_admin(email):
+        abort(403)
+    return email
+
+
+def situacao_do_robo(porta):
+    """parado, trabalhando, pausado (esperando alguém) ou fora do ar, pela consulta do próprio robô."""
+    try:
+        conexao = http.client.HTTPConnection("127.0.0.1", porta, timeout=2)
+        conexao.request("GET", "/api/estado?desde=999999999")
+        estado = json.loads(conexao.getresponse().read())
+        conexao.close()
+    except (OSError, ValueError):
+        return "fora do ar"
+    return "pausado" if estado.get("pausa") else "trabalhando" if estado.get("tarefa") else "parado"
+
+
+@app.get("/admin/escritorios")
+def admin_escritorios():
+    admin_da_sessao()
+    dados = ler_escritorios()
+    lista = [{"id": id_, "nome": e["nome"], "emails": e["emails"], "robo": situacao_do_robo(e["porta"])}
+             for id_, e in sorted(dados["escritorios"].items(), key=lambda par: par[1]["nome"].lower())]
+    return jsonify(escritorios=lista, admins=dados.get("admins", []))
+
+
+@app.post("/admin/abrir")
+def admin_abrir():
+    """Administrador abre um escritório na página (fica no registro); depois a página manda X-Escritorio."""
+    email = admin_da_sessao()
+    id_ = str((request.get_json(silent=True) or {}).get("id", ""))
+    if id_ not in ler_escritorios()["escritorios"]:
+        return jsonify(erro="Esse escritório não existe."), 404
+    auditar(email, "abriu o escritório", escritorio=id_)
+    return jsonify(ok=True)
+
+
+def mandar_links(emails):
+    """Cria cada usuário no Firebase e manda o link de criar senha."""
+    for e in emails:
+        criar_usuario(e)
+        pedir_nova_senha(e)
+
+
+@app.post("/admin/escritorios")
+def admin_criar_escritorio():
+    """Escritório novo: entra no escritorios.json, o robô é ligado (ligar_escritorio.sh, com sudo) e cada e-mail
+    recebe o link de criar senha."""
+    email = admin_da_sessao()
+    corpo = request.get_json(silent=True) or {}
+    id_, nome = str(corpo.get("id", "")).strip().lower(), str(corpo.get("nome", ""))
+    emails = [str(e) for e in corpo.get("emails", []) if str(e).strip()]
+    with trava_escritorios:
+        if id_ in ler_escritorios()["escritorios"]:
+            return jsonify(erro=f"Já existe um escritório com o identificador '{id_}'."), 400
+        try:
+            porta = escritorio_novo.adicionar(ARQUIVO_ESCRITORIOS, id_, nome, emails)
+        except SystemExit as e:
+            return jsonify(erro=str(e)), 400
+    try:
+        subprocess.run(LIGAR_ESCRITORIO + [id_, str(porta)], check=True, capture_output=True, text=True, timeout=180)
+    except (subprocess.SubprocessError, OSError) as e:
+        detalhe = getattr(e, "stderr", "") or str(e)
+        auditar(email, "criou o escritório (robô NÃO ligou)", escritorio=id_, erro=detalhe[-300:])
+        return jsonify(erro=f"O escritório entrou na lista, mas o robô dele não ligou: {detalhe.strip()[-200:]}"), 502
+    try:
+        mandar_links(escritorio_novo.limpar_emails(emails))
+    except (SystemExit, Exception) as e:
+        auditar(email, "criou o escritório (links NÃO enviados)", escritorio=id_, erro=str(e)[-300:])
+        return jsonify(erro=f"Escritório criado, mas os links de criar senha não foram: {e}"), 502
+    auditar(email, "criou o escritório", escritorio=id_, nome=nome.strip(), emails=emails)
+    return jsonify(ok=True)
+
+
+@app.post("/admin/escritorios/<id_>/emails")
+def admin_emails(id_):
+    """{"adicionar": [...]} libera e-mails (com o link de criar senha); {"retirar": [...]} corta o acesso na hora."""
+    email = admin_da_sessao()
+    corpo = request.get_json(silent=True) or {}
+    adicionar = [str(e) for e in corpo.get("adicionar", []) if str(e).strip()]
+    retirar = [str(e) for e in corpo.get("retirar", []) if str(e).strip()]
+    with trava_escritorios:
+        if id_ not in ler_escritorios()["escritorios"]:
+            return jsonify(erro="Esse escritório não existe."), 404
+        try:
+            if adicionar:
+                escritorio_novo.adicionar(ARQUIVO_ESCRITORIOS, id_, "", adicionar)
+            if retirar:
+                escritorio_novo.retirar(ARQUIVO_ESCRITORIOS, id_, retirar)
+        except SystemExit as e:
+            return jsonify(erro=str(e)), 400
+    if adicionar:
+        try:
+            mandar_links(escritorio_novo.limpar_emails(adicionar))
+        except (SystemExit, Exception) as e:
+            auditar(email, "liberou e-mails (links NÃO enviados)", escritorio=id_, emails=adicionar, erro=str(e)[-300:])
+            return jsonify(erro=f"E-mails liberados, mas os links de criar senha não foram: {e}"), 502
+        auditar(email, "liberou e-mails", escritorio=id_, emails=adicionar)
+    if retirar:
+        auditar(email, "retirou e-mails", escritorio=id_, emails=retirar)
+    return jsonify(ok=True)
+
+
+@app.get("/admin/registro")
+def admin_registro():
+    """As últimas 100 ações de administrador, da mais nova para a mais antiga."""
+    admin_da_sessao()
+    try:
+        with open(ARQUIVO_AUDITORIA, encoding="utf-8") as f:
+            linhas = f.readlines()[-100:]
+    except FileNotFoundError:
+        linhas = []
+    return jsonify(registro=[json.loads(l) for l in reversed(linhas) if l.strip()])
 
 
 def repassar(porta):
