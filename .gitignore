@@ -1,3 +1,9 @@
 # dados deste escritório: login do PJe, configuração, perfil do Chrome e fotos das pausas (têm dados de clientes)
 dados_do_escritorio/
 __pycache__/
+# prints e fotos soltos na pasta do robô (ex.: QR do autenticador): nunca no GitHub, que é público
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/*.heic
