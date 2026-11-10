@@ -114,6 +114,9 @@ def test_publicar_pagina_no_firebase_hosting():
     arquivos = publicar_pagina.arquivos(api)
     assert f'<meta name="api" content="{api}">' in arquivos["/index.html"].decode("utf-8")
     assert any(c.startswith("/fontes/") and c.endswith(".woff2") for c in arquivos)
+    for pagina_publica in ("/privacidade.html", "/termos.html"):  # o Google pede as duas para publicar o app
+        assert b"Theo Brandini Carvalho" in arquivos[pagina_publica] and b"theotheteo@gmail.com" in arquivos[pagina_publica]
+    assert publicar_pagina.configuracao(api)["cleanUrls"] is True  # abrem como /privacidade e /termos
     cfg = publicar_pagina.configuracao(api)
     assert cfg["rewrites"] == [{"glob": "**", "path": "/index.html"}]  # /nova-senha do e-mail mostra a página
     politica = cfg["headers"][0]["headers"]["Content-Security-Policy"]

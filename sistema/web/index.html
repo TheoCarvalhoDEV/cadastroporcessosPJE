@@ -1893,7 +1893,10 @@ function desenharEntrar() {
       if (!email.value) return mostrar("Escreva o seu e-mail acima e clique de novo em Esqueci a senha.");
       try { await api("/esqueci", { email: email.value }); mostrar("Se o e-mail estiver cadastrado, chega um link para criar uma senha nova.", true); }
       catch (e) { mostrar(e.message); }
-    } }, "Esqueci a senha")));
+    } }, "Esqueci a senha"),
+    // página no Firebase Hosting: os links públicos que o Google pede na página inicial
+    API ? h("p", { class: "dica", style: "margin:0;text-align:center" }, h("a", { href: "/privacidade" }, "Política de Privacidade"), " · ",
+      h("a", { href: "/termos" }, "Termos de Serviço")) : null));
   email.focus();
 }
 // "Fazer login com o Google": o botão oficial do Google (Google Identity Services) devolve um token assinado pelo

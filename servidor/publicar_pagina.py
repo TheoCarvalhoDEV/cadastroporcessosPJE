@@ -29,7 +29,8 @@ def configuracao(api, google=False):
     seguranca = {"Content-Security-Policy": politica, "X-Content-Type-Options": "nosniff",
                  "Referrer-Policy": "no-referrer", "Strict-Transport-Security": "max-age=31536000",
                  "Permissions-Policy": "camera=(), microphone=(), geolocation=()"}
-    return {"rewrites": [{"glob": "**", "path": "/index.html"}],
+    return {"cleanUrls": True,  # /privacidade e /termos (as páginas públicas que o Google pede) sem o .html
+            "rewrites": [{"glob": "**", "path": "/index.html"}],
             "headers": [{"glob": "**", "headers": {**seguranca, "Cache-Control": "no-cache"}},
                         {"glob": "/fontes/**", "headers": {"Cache-Control": "public, max-age=31536000, immutable"}}]}
 
@@ -44,6 +45,9 @@ def arquivos(api, google_client=""):
     pagina = pagina.replace(META_VAZIA, f'<meta name="api" content="{api}">')
     pagina = pagina.replace(META_GOOGLE, f'<meta name="google-client" content="{google_client}">')
     saida = {"/index.html": pagina.encode("utf-8")}
+    for nome in ("privacidade.html", "termos.html"):  # Política de Privacidade e Termos de Serviço
+        with open(os.path.join(WEB, nome), "rb") as f:
+            saida["/" + nome] = f.read()
     for nome in sorted(os.listdir(os.path.join(WEB, "fontes"))):
         if nome.endswith(".woff2"):
             with open(os.path.join(WEB, "fontes", nome), "rb") as f:

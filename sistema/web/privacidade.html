@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidade · Autus</title>
+<link rel="icon" href="data:,">
+<style>
+  @font-face { font-family: "Plus Jakarta Sans"; font-weight: 200 800; font-display: swap;
+    src: url(/fontes/plus-jakarta-sans-latin-wght-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Plus Jakarta Sans"; font-weight: 200 800; font-display: swap;
+    src: url(/fontes/plus-jakarta-sans-latin-ext-wght-normal.woff2) format("woff2"); unicode-range: U+0100-024F, U+1E00-1EFF; }
+  :root { --fundo: #F3F5FA; --superficie: #fff; --borda: #E4E7EF; --tinta: #141A2E; --tinta-2: #3F485C; --cor: #2F55E8; }
+  @media (prefers-color-scheme: dark) { :root { --fundo: #0E1220; --superficie: #171C2E; --borda: #262D45; --tinta: #E8EBF4; --tinta-2: #B5BCCD; --cor: #7C97FF; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--tinta); font: 400 16px/1.65 "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 18px clamp(16px, 4vw, 48px); background: var(--superficie); border-bottom: 1px solid var(--borda); }
+  .sigla { width: 40px; height: 40px; border-radius: 12px; background: #2F55E8; color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+  header a { color: inherit; text-decoration: none; font-weight: 800; font-size: 18px; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 16px 64px; }
+  article { background: var(--superficie); border: 1px solid var(--borda); border-radius: 20px; padding: clamp(24px, 5vw, 48px); }
+  h1 { margin: 0 0 4px; font-size: clamp(26px, 4vw, 32px); font-weight: 800; letter-spacing: -.01em; line-height: 1.2; }
+  h2 { margin: 32px 0 8px; font-size: 19px; font-weight: 800; }
+  p, li { color: var(--tinta-2); }
+  .data { margin: 0 0 24px; font-size: 14px; }
+  a { color: var(--cor); }
+  ul { padding-left: 22px; }
+  footer { text-align: center; font-size: 14px; color: var(--tinta-2); padding: 24px 16px 40px; }
+</style>
+</head>
+<body>
+<header><span class="sigla" aria-hidden="true">AU</span><a href="/">Autus</a></header>
+<main>
+<article>
+  <h1>Política de Privacidade</h1>
+  <p class="data">Atualizada em 10 de novembro de 2026.</p>
+
+  <p>O Autus é um sistema que ajuda escritórios de advocacia a cadastrar processos no PJe: um robô preenche o
+  cadastro e deixa o processo como <strong>rascunho</strong>, sem assinar e sem protocolar. Esta política explica
+  quais dados o Autus trata, para quê, por quanto tempo e como você exerce os seus direitos, conforme a Lei Geral de
+  Proteção de Dados (Lei nº 13.709/2018, LGPD).</p>
+
+  <h2>1. Quem é o responsável</h2>
+  <p>O Autus é mantido por <strong>Theo Brandini Carvalho</strong>. Para qualquer assunto de privacidade, escreva para
+  <a href="mailto:theotheteo@gmail.com">theotheteo@gmail.com</a>.</p>
+  <p>Quanto aos dados das <strong>contas de acesso</strong> ao Autus, o responsável acima é o controlador. Quanto aos
+  dados dos <strong>clientes do escritório</strong> (petições, documentos e dados das partes), quem decide o que é
+  tratado é o escritório, que é o controlador; o Autus atua como operador e trata esses dados apenas para executar o
+  cadastro que o escritório pediu.</p>
+
+  <h2>2. Quais dados tratamos</h2>
+  <ul>
+    <li><strong>Conta de acesso:</strong> nome e e-mail de quem usa o Autus. Quem entra com a conta Google compartilha
+      apenas o nome e o e-mail confirmados pelo Google; não temos acesso à senha do Google.</li>
+    <li><strong>Login do PJe do escritório:</strong> CPF, senha e a chave do código de verificação em duas etapas, usados
+      pelo robô para entrar no PJe. Ficam guardados em um cofre de senhas criptografado e não aparecem de novo na tela
+      depois de salvos.</li>
+    <li><strong>Pastas dos clientes:</strong> a petição inicial, os anexos e a ficha que o escritório envia, com os dados
+      pessoais das partes que estiverem nesses documentos (inclusive dados sensíveis, quando o próprio processo os
+      contiver).</li>
+    <li><strong>Registros do funcionamento:</strong> o histórico dos cadastros (o que deu certo, pausas e erros), fotos da
+      tela do PJe e a página do PJe salva quando o robô para, e o registro das ações feitas pelo administrador do Autus.</li>
+  </ul>
+
+  <h2>3. Para que usamos</h2>
+  <ul>
+    <li>Cadastrar os processos no PJe, como rascunho, a pedido do escritório.</li>
+    <li>Mostrar ao escritório o andamento, as pausas e o relatório dos cadastros.</li>
+    <li>Dar suporte e corrigir erros do robô (por isso guardamos a foto e a página do PJe quando ele para).</li>
+    <li>Proteger o sistema: controlar quem tem acesso e registrar as ações do administrador.</li>
+  </ul>
+  <p>As bases legais são a execução do contrato com o escritório e o legítimo interesse na segurança do sistema. Os dados
+  dos clientes do escritório são tratados conforme as instruções do escritório, que é o controlador. Não usamos os dados
+  para publicidade e não os vendemos.</p>
+
+  <h2>4. Com quem compartilhamos</h2>
+  <ul>
+    <li><strong>Google Cloud e Firebase (Google):</strong> hospedam o servidor, a página e o login. O servidor e os
+      dados ficam no Brasil (São Paulo).</li>
+    <li><strong>Tribunal (PJe):</strong> os dados do processo são enviados ao PJe do tribunal, porque é para isso que o
+      escritório usa o Autus.</li>
+  </ul>
+  <p>Fora isso, só compartilhamos dados se a lei ou uma ordem judicial exigir.</p>
+
+  <h2>5. Por quanto tempo guardamos</h2>
+  <ul>
+    <li>Pastas de clientes já cadastrados, a lixeira e as fotos das pausas são apagadas automaticamente <strong>30 dias</strong>
+      depois. Pastas de clientes ainda não cadastrados ficam até o escritório cadastrar ou apagar.</li>
+    <li>As cópias de segurança diárias do servidor são guardadas por <strong>7 dias</strong>.</li>
+    <li>A conta de acesso e o login do PJe ficam enquanto o escritório usar o Autus; quando o escritório sai, apagamos.</li>
+  </ul>
+
+  <h2>6. Como protegemos</h2>
+  <p>Toda a comunicação usa HTTPS. O login do PJe fica em um cofre de senhas criptografado, separado para cada escritório.
+  Cada escritório só vê os próprios dados. Só entra quem foi liberado; a sessão vence em 12 horas e sair encerra o acesso
+  na hora. As ações do administrador do Autus ficam registradas.</p>
+
+  <h2>7. Cookies e dados no navegador</h2>
+  <p>O Autus não usa cookies de publicidade nem de rastreamento. O navegador guarda apenas a chave da sua sessão e a
+  preferência de tema (claro ou escuro). O botão "Fazer login com o Google" é fornecido pelo Google e segue a
+  <a href="https://policies.google.com/privacy?hl=pt-BR" rel="noopener">Política de Privacidade do Google</a>.</p>
+
+  <h2>8. Seus direitos</h2>
+  <p>Você pode pedir confirmação de que tratamos seus dados, acesso, correção, anonimização, portabilidade, eliminação,
+  informações sobre compartilhamento e revogação do consentimento, entre os demais direitos do art. 18 da LGPD. Escreva
+  para <a href="mailto:theotheteo@gmail.com">theotheteo@gmail.com</a>. Se você é cliente de um escritório que usa o
+  Autus, também pode falar diretamente com o escritório, que é o controlador dos seus dados.</p>
+
+  <h2>9. Mudanças nesta política</h2>
+  <p>Se esta política mudar, a data no topo será atualizada e, se a mudança for importante, avisaremos os escritórios.</p>
+</article>
+</main>
+<footer><a href="/">Voltar ao Autus</a> · <a href="/termos">Termos de Serviço</a></footer>
+</body>
+</html>
