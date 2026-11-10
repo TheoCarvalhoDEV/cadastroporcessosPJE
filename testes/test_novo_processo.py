@@ -708,6 +708,49 @@ def test_limpar_chave():
     assert robo.limpar_chave("") == ""
 
 
+def exportacao_do_authenticator(*contas):
+    """Texto do QR de 'Transferir contas' do Google Authenticator com as contas (chave base32, nome, emissor)."""
+    import base64 as b64
+    def campo(n, valor):
+        return bytes([n << 3 | 2, len(valor)]) + valor
+    corpo = b"".join(campo(1, campo(1, b64.b32decode(k)) + campo(2, nome.encode()) + campo(3, emissor.encode())
+                               + bytes([4 << 3, 1, 5 << 3, 1, 6 << 3, 2])) for k, nome, emissor in contas)
+    from urllib.parse import quote
+    return "otpauth-migration://offline?data=" + quote(b64.b64encode(corpo).decode())
+
+
+def test_contas_do_texto_qr():
+    pje, gmail = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+    assert robo.contas_do_texto_qr(f"otpauth://totp/PDPJ:Escritorio?secret={pje.lower()}&issuer=PDPJ") == \
+        [{"chave": pje, "emissor": "PDPJ", "nome": "Escritorio"}]
+    contas = robo.contas_do_texto_qr(exportacao_do_authenticator((pje, "Escritório", "PDPJ"), (gmail, "a@b.com", "Google")))
+    assert [(c["chave"], c["emissor"]) for c in contas] == [(pje, "PDPJ"), (gmail, "Google")]
+    assert robo.contas_do_texto_qr("https://pje.tjmt.jus.br") == []
+
+
+def test_conta_do_pje_no_qr():
+    import io
+    import zxingcpp
+    from PIL import Image
+    pje, gmail = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+
+    def imagem(texto):  # um QR de verdade, em JPG (como o print que chega pelo WhatsApp)
+        m = memoryview(zxingcpp.create_barcode(texto, zxingcpp.BarcodeFormat.QRCode).to_image(scale=6))
+        saida = io.BytesIO()
+        Image.frombytes("L", (m.shape[1], m.shape[0]), m.tobytes()).save(saida, "JPEG", quality=70)
+        return saida.getvalue()
+    # duas contas: escolhe a do PJe pelo emissor
+    assert robo.conta_do_pje_no_qr(imagem(exportacao_do_authenticator((gmail, "a@b.com", "Google"),
+                                                                     (pje, "Escritório", "PDPJ"))))["chave"] == pje
+    for img, msg in [(imagem("https://exemplo.com"), "não é de um app autenticador"), (b"nada", "abrir a imagem"),
+                     (imagem(exportacao_do_authenticator((gmail, "a", "Google"), (pje, "b", "Banco"))), "2 contas")]:
+        try:
+            robo.conta_do_pje_no_qr(img)
+            assert False, msg
+        except ValueError as e:
+            assert msg in str(e), e
+
+
 def test_login_com_chave_invalida_explica():
     pagina = mock.Mock()
     with mock.patch.multiple(robo, ler_config=lambda: {"cpf": "1", "senha": "s", "totp_key": "ABC1 DEFG"},

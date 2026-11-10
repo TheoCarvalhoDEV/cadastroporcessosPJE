@@ -1243,7 +1243,37 @@ function cfgLogin() {
       campo("CPF", h("input", { class: "mono", inputmode: "numeric", value: pjeDigitado.cpf, oninput: ev => { pjeDigitado.cpf = ev.target.value; mudou(); } })),
       campo("Senha do PJe", senha)),
     campo("Chave do autenticador", totp, "Se você já tem a chave do app autenticador (2 fatores), cole aqui. Não são os 6 números."),
+    leitorDeQR(totp),
     h("div", { class: "autenticador", id: "autenticador" }));
+}
+// print ou foto do QR (o do PJe ou o de "Transferir contas" do Google Authenticator): o robô lê a chave e põe no campo
+function leitorDeQR(campoChave) {
+  const resultado = h("div", {});
+  const arquivo = h("input", { type: "file", accept: "image/*", hidden: true, "aria-label": "Imagem do QR" });
+  const botao = h("button", { class: "botao", type: "button", onclick: () => arquivo.click() }, "Ler a chave de um QR (print ou foto)");
+  arquivo.addEventListener("change", async () => {
+    const imagem = arquivo.files[0];
+    arquivo.value = "";
+    if (!imagem) return;
+    const corpo = new FormData();
+    corpo.append("imagem", imagem, imagem.name);
+    botao.disabled = true;
+    try {
+      const r = await fetch("/api/autenticador/ler-qr", { method: "POST", body: corpo });
+      const dados = await r.json().catch(() => ({}));
+      if (r.status === 401 && dados.entrar) return mostrarTela("entrar");
+      if (!r.ok) throw new Error(dados.erro || `O servidor respondeu ${r.status}.`);
+      pjeDigitado.totp_key = campoChave.value = dados.chave;
+      mudou();
+      encher(resultado, h("div", { class: "aviso ok" }, icone("certo"), h("div", {},
+        h("strong", {}, `QR lido: conta ${[dados.emissor, dados.nome].filter(Boolean).join(" · ") || "do autenticador"}.`),
+        h("p", {}, "Confira no app do celular: o código desta conta agora é ", h("span", { class: "mono" }, dados.codigo),
+          " (muda a cada 30 segundos). Se bater, clique em Salvar alterações."))));
+    } catch (e) {
+      encher(resultado, h("div", { class: "aviso erro" }, icone("erro"), h("p", {}, e.message)));
+    } finally { botao.disabled = false; }
+  });
+  return h("div", {}, h("div", { class: "linha" }, botao, arquivo), resultado);
 }
 
 // ---------- o robô configura o código de 2 fatores (primeiro acesso / chave perdida) ----------

@@ -716,6 +716,81 @@ CHAVE_INVALIDA = ("a chave do autenticador está errada: ela só tem letras de A
                   "não trocou I por 1, O por 0 ou B por 8)")
 
 
+def _protobuf(dados):
+    """[(número do campo, valor)] de uma mensagem protobuf (só o que a exportação do Google Authenticator usa)."""
+    def varint(i):
+        n = s = 0
+        while True:
+            c = dados[i]
+            i += 1
+            n, s = n | (c & 0x7F) << s, s + 7
+            if not c & 0x80:
+                return n, i
+    i, campos = 0, []
+    while i < len(dados):
+        chave, i = varint(i)
+        tipo = chave & 7
+        if tipo == 0:
+            valor, i = varint(i)
+        elif tipo == 2:
+            n, i = varint(i)
+            valor, i = dados[i:i + n], i + n
+        elif tipo in (1, 5):
+            n = 8 if tipo == 1 else 4
+            valor, i = dados[i:i + n], i + n
+        else:
+            raise ValueError(f"protobuf tipo {tipo}")
+        campos.append((chave >> 3, valor))
+    return campos
+
+
+def contas_do_texto_qr(texto):
+    """As contas de 2 fatores de um QR: [{chave, emissor, nome}]. Aceita o QR de cadastro (otpauth://totp/...) e o de
+    'Transferir contas' do Google Authenticator (otpauth-migration://...). Só TOTP de 6 dígitos (o do PJe)."""
+    from urllib.parse import urlparse, parse_qs, unquote
+    url = urlparse(texto.strip())
+    q = parse_qs(url.query)
+    if url.scheme == "otpauth" and url.netloc == "totp":
+        nome = unquote(url.path.lstrip("/"))
+        emissor = q.get("issuer", [nome.split(":")[0] if ":" in nome else ""])[0]
+        contas = [{"chave": q.get("secret", [""])[0], "emissor": emissor, "nome": nome.split(":", 1)[-1]}]
+    elif url.scheme == "otpauth-migration":
+        contas = []
+        for n, v in _protobuf(base64.b64decode(q.get("data", [""])[0])):
+            if n != 1:
+                continue
+            p = dict(_protobuf(v))  # 1 chave, 2 nome, 3 emissor, 4 algoritmo, 5 dígitos, 6 tipo (0 = não informado)
+            if p.get(4, 1) in (0, 1) and p.get(5, 1) in (0, 1) and p.get(6, 2) in (0, 2):  # SHA1, 6 dígitos, TOTP
+                contas.append({"chave": base64.b32encode(p.get(1, b"")).decode(), "emissor": p.get(3, b"").decode(),
+                               "nome": p.get(2, b"").decode()})
+    else:
+        return []
+    return [{**c, "chave": limpar_chave(c["chave"])} for c in contas if limpar_chave(c["chave"])]
+
+
+def conta_do_pje_no_qr(imagem):
+    """A conta do PJe num QR (bytes da imagem: print ou foto). Para (ValueError com a mensagem) se não der."""
+    import io
+    import zxingcpp  # leitor de QR (pequeno, sem dependências)
+    from PIL import Image, ImageOps
+    try:
+        foto = ImageOps.exif_transpose(Image.open(io.BytesIO(imagem))).convert("L")
+    except Exception:
+        raise ValueError("Não consegui abrir a imagem. Envie um print ou foto (PNG ou JPG).")
+    textos = [r.text for r in zxingcpp.read_barcodes(foto)]
+    if not textos:
+        raise ValueError("Não achei um QR na imagem. Tire um print com o QR inteiro e nítido.")
+    contas = [c for t in textos for c in contas_do_texto_qr(t)]
+    if not contas:
+        raise ValueError("Esse QR não é de um app autenticador. Use o QR do PJe ou o de 'Transferir contas' do Google Authenticator.")
+    do_pje = [c for c in contas if re.search(r"pje|pdpj|jus\.?br|tjmt", f"{c['emissor']} {c['nome']}", re.I)]
+    if len(contas) == 1 or len(do_pje) == 1:
+        return (do_pje or contas)[0]
+    nomes = ", ".join(c["emissor"] or c["nome"] for c in contas)
+    raise ValueError(f"O QR tem {len(contas)} contas ({nomes}) e não sei qual é a do PJe. "
+                     "Exporte só a conta do PJe no Google Authenticator e envie de novo.")
+
+
 def mensagens_da_tela(d):
     return " ".join(e.inner_text().strip() for e in d.query_selector_all(ERRO_LOGIN) if e.inner_text().strip())
 

@@ -151,6 +151,21 @@ def test_link_do_autenticador():
     app_web.robo.parar = False
 
 
+def test_ler_qr_do_autenticador():
+    """A imagem do QR vira a chave para o campo (não grava nada) e o código de agora, para conferir no celular."""
+    import io
+    web = app_web.app.test_client()
+    chave = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+    assert web.post("/api/autenticador/ler-qr").status_code == 400  # sem imagem
+    with mock.patch.object(robo, "conta_do_pje_no_qr", lambda b: {"chave": chave, "emissor": "PDPJ", "nome": "Escritório"}), \
+         mock.patch.object(robo, "gravar_config", lambda c: (_ for _ in ()).throw(AssertionError("não grava"))):
+        r = web.post("/api/autenticador/ler-qr", data={"imagem": (io.BytesIO(b"png"), "qr.png")}).get_json()
+    assert r["chave"] == chave and r["emissor"] == "PDPJ" and r["codigo"] == robo.pyotp.TOTP(chave).now()
+    with mock.patch.object(robo, "conta_do_pje_no_qr", lambda b: (_ for _ in ()).throw(ValueError("Não achei um QR"))):
+        r = web.post("/api/autenticador/ler-qr", data={"imagem": (io.BytesIO(b"x"), "x.jpg")})
+    assert r.status_code == 400 and "Não achei" in r.get_json()["erro"]
+
+
 # ---------- modo servidor ----------
 
 import threading

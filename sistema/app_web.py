@@ -591,6 +591,23 @@ def ver_qr():
     return jsonify(qr=config.get("totp_qr", ""), chave=" ".join(re.findall(".{1,4}", config["totp_key"].replace(" ", ""))))
 
 
+@app.post("/api/autenticador/ler-qr")
+def ler_qr():
+    """Print ou foto do QR do autenticador -> a chave, para a página pôr no campo (só grava ao Salvar alterações).
+    A imagem fica só na memória. Devolve o código de agora para conferir com o celular."""
+    arquivo = request.files.get("imagem")
+    if not arquivo:
+        abort(400, "Escolha a imagem do QR.")
+    try:
+        conta = robo.conta_do_pje_no_qr(arquivo.read(10 * 1024 * 1024))
+    except ValueError as e:
+        abort(400, str(e))
+    except ImportError:
+        abort(409, "Falta o leitor de QR neste computador: rode  pip install zxing-cpp pillow  e abra o programa de novo.")
+    return jsonify(chave=conta["chave"], emissor=conta["emissor"], nome=conta["nome"],
+                   codigo=robo.pyotp.TOTP(conta["chave"]).now())
+
+
 @app.post("/api/autenticador/fechar")
 def fechar_autenticador():
     """Tira da página o QR e a chave (só ficam na memória até fecharem)."""

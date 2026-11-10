@@ -5,3 +5,5 @@ pyotp
 PyPDF2
 google-cloud-secret-manager
 waitress
+zxing-cpp
+pillow

@@ -58,5 +58,5 @@ NO SERVIDOR (o escritório usa só o navegador; projeto: docs\superpowers\specs\
 PARA LEVAR A OUTRO ESCRITÓRIO
   Copie esta pasta SEM dados_do_escritorio\ (ou baixe do GitHub: github.com/TheoCarvalhoDEV/cadastroporcessosPJE).
   No computador novo: Python 3 e Google Chrome instalados, e uma vez no Prompt de Comando:
-      pip install flask playwright python-docx pyotp PyPDF2
+      pip install flask playwright python-docx pyotp PyPDF2 zxing-cpp pillow
   Depois: Abrir cadastro.bat > Configurações (login do PJe, pasta, nome, cor) > Salvar alterações.
