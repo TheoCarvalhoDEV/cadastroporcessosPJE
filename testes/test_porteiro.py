@@ -98,7 +98,8 @@ def test_criar_senha_pelo_link_do_email():
         assert chamadas == [("resetPassword", {"oobCode": "abc", "newPassword": "segredo1"})]
         assert web.post("/nova-senha", json={"codigo": "abc", "senha": ""}).status_code == 400
         assert web.post("/nova-senha", json={"codigo": "", "senha": "segredo1"}).status_code == 400
-    for erro, trecho in (("EXPIRED_OOB_CODE", "venceu"), ("INVALID_OOB_CODE", "venceu"), ("WEAK_PASSWORD : x", "6")):
+    for erro, trecho in (("EXPIRED_OOB_CODE", "venceu"), ("INVALID_OOB_CODE", "venceu"), ("WEAK_PASSWORD : x", "10"),
+                         ("PASSWORD_DOES_NOT_MEET_REQUIREMENTS : Missing password requirements: [numeric]", "número")):
         with mock.patch.object(porteiro, "firebase", lambda a, c: (400, {"error": {"message": erro}})):
             r = web.post("/nova-senha", json={"codigo": "abc", "senha": "123"})
             assert r.status_code == 400 and trecho in r.get_json()["erro"], (erro, r.get_json())
@@ -122,8 +123,12 @@ def test_email_de_criar_senha_vai_com_a_conta_da_maquina():
          mock.patch.object(porteiro.urllib.request, "urlopen", abrir):
         porteiro.pedir_nova_senha("a@x.com")
         porteiro.entrar_no_firebase("a@x.com", "s")
+        porteiro.criar_usuario("b@x.com")  # o cadastro aberto do Firebase é desligado: só a máquina cria conta
     assert pedidos[0].get_header("Authorization") == "Bearer TOKEN" and "sendOobCode" in pedidos[0].full_url
     assert pedidos[1].get_header("Authorization") is None  # o login da pessoa não usa a conta da máquina
+    assert pedidos[2].get_header("Authorization") == "Bearer TOKEN" and "signUp" in pedidos[2].full_url
+    senha = json.loads(pedidos[2].data)["password"]
+    assert len(senha) >= 10 and any(c.isdigit() for c in senha)  # a senha provisória cumpre a regra de senha
 
 
 if __name__ == "__main__":

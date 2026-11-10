@@ -1502,7 +1502,7 @@ function desenharEntrar() {
 function desenharNovaSenha() {
   mostrarTela("entrar");
   const codigo = new URLSearchParams(location.search).get("oobCode") || "";
-  const senha = h("input", { type: "password", autocomplete: "new-password", required: true, minlength: 6 });
+  const senha = h("input", { type: "password", autocomplete: "new-password", required: true, minlength: 10 });
   const repetir = h("input", { type: "password", autocomplete: "new-password", required: true });
   const msg = h("div", { class: "aviso erro", role: "alert", hidden: true });
   const mostrar = (texto, ok) => { msg.className = "aviso " + (ok ? "ok" : "erro"); encher(msg, icone(ok ? "certo" : "erro"), h("p", { style: "margin:0" }, texto)); msg.hidden = false; };
@@ -1510,6 +1510,7 @@ function desenharNovaSenha() {
   encher($("#tela-entrar"), h("form", { class: "cartao", onsubmit: async ev => {
     ev.preventDefault();
     if (senha.value !== repetir.value) return mostrar("As duas senhas não são iguais.");
+    if (senha.value.length < 10 || !/\d/.test(senha.value)) return mostrar("A senha precisa de pelo menos 10 caracteres, com pelo menos um número.");
     botao.disabled = true;
     try {
       await api("/nova-senha", { codigo, senha: senha.value });
@@ -1518,7 +1519,7 @@ function desenharNovaSenha() {
       botao.onclick = () => location.href = "/";
     } catch (e) { mostrar(e.message); botao.disabled = false; }
   } },
-    h("h1", {}, "Criar sua senha"), h("p", { class: "dica", style: "margin:0" }, "Pelo menos 6 caracteres."),
+    h("h1", {}, "Criar sua senha"), h("p", { class: "dica", style: "margin:0" }, "Pelo menos 10 caracteres, com pelo menos um número."),
     campo("Senha nova", senha), campo("Repita a senha", repetir), msg, botao));
   senha.focus();
 }

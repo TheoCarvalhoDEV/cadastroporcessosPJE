@@ -19,6 +19,8 @@ ARQUIVO_ESCRITORIOS = os.path.join(RAIZ, "escritorios.json")
 API_KEY = os.environ["FIREBASE_API_KEY"]
 PORTA = int(os.environ.get("ROBO_PORTA_PORTEIRO", 8800))
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sistema", "web")
+# a regra de senha fica no Firebase (Authentication > Settings > Password policy): mínimo 10 e pelo menos um número
+REGRA_DA_SENHA = "A senha precisa de pelo menos 10 caracteres, com pelo menos um número."
 
 REPASSA_IDA = ("Content-Type", "Content-Length", "If-None-Match", "Accept-Encoding")  # nunca o Cookie da sessão
 REPASSA_VOLTA = ("Content-Type", "Content-Encoding", "ETag", "Cache-Control", "Vary")
@@ -96,8 +98,9 @@ def pedir_nova_senha(email):
 
 
 def criar_usuario(email):
-    """Cria o usuário com uma senha aleatória (a pessoa cria a dela pelo e-mail de pedir_nova_senha)."""
-    status, resposta = firebase("signUp", {"email": email, "password": secrets.token_urlsafe(24)})
+    """Cria o usuário com uma senha aleatória (a pessoa cria a dela pelo e-mail de pedir_nova_senha). Vai com a conta
+    da máquina: o cadastro aberto do Firebase fica desligado (ninguém cria conta só com a chave de API)."""
+    status, resposta = firebase("signUp", {"email": email, "password": secrets.token_urlsafe(24) + "9"}, como_maquina=True)
     if status != 200 and "EMAIL_EXISTS" not in json.dumps(resposta):
         raise SystemExit(f"Não consegui criar o usuário {email} no Firebase: {resposta}")
 
@@ -191,8 +194,8 @@ def nova_senha():
     if status == 200:
         return jsonify(ok=True)
     motivo = json.dumps(resposta)
-    if "WEAK_PASSWORD" in motivo:
-        return jsonify(erro="A senha precisa de pelo menos 6 caracteres."), 400
+    if "WEAK_PASSWORD" in motivo or "PASSWORD_DOES_NOT_MEET_REQUIREMENTS" in motivo:  # regra de senha do Firebase
+        return jsonify(erro=REGRA_DA_SENHA), 400
     return jsonify(erro="O link venceu ou já foi usado. Na tela de entrar, clique em Esqueci a senha para receber outro."), 400
 
 
