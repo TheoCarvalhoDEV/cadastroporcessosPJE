@@ -6,7 +6,7 @@
 <!-- endereço do servidor quando a página sai do Firebase Hosting (servidor/publicar_pagina.py preenche); vazio: a
      página e o servidor são o mesmo endereço (modo local, ou o próprio servidor) -->
 <meta name="api" content="">
-<title>Cadastro no PJe</title>
+<title>Autus</title>
 <link rel="icon" href="data:,">
 <link rel="preload" href="/fontes/plus-jakarta-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <script>
@@ -589,7 +589,7 @@
 </head>
 <body>
 <nav class="rail" aria-label="Menu principal">
-  <span class="sigla" id="sigla" aria-hidden="true">PJ</span>
+  <span class="sigla" id="sigla" aria-hidden="true">AU</span>
   <button class="nav-item" id="ir-cadastro" type="button" aria-current="true"></button>
   <button class="nav-item" id="abrir-relatorio" type="button" aria-current="false"></button>
   <button class="nav-item" id="abrir-config" type="button" aria-current="false"></button>
@@ -602,7 +602,7 @@
 </nav>
 <header class="topo">
   <div class="marca">
-    <div><strong id="nome-escritorio">Cadastro no PJe</strong><small>Cadastro de processos no PJe do TJMT</small></div>
+    <div><strong id="nome-escritorio">Autus</strong><small>Cadastro de processos no PJe do TJMT</small></div>
   </div>
   <div class="topo-direita">
     <button id="status" type="button"><span class="ponto"></span><span id="status-texto">Robô parado</span></button>
@@ -855,12 +855,14 @@ function aplicarIdentidade() {
     .map(c => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   raiz.setProperty("--sobre-cor", 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#141A2E" : "#fff");  // cor clara: texto escuro
   const nome = (cfg.nome || "").trim();
-  $("#nome-escritorio").textContent = nome || "Cadastro no PJe";
+  // o nome do escritório em destaque; embaixo, o do sistema (Autus)
+  $("#nome-escritorio").textContent = nome || "Autus";
+  $(".topo .marca small").textContent = nome ? "Autus · cadastro de processos no PJe" : "Cadastro de processos no PJe do TJMT";
   // sigla: "JVO Advocacia" -> JV (a 1ª palavra já é sigla); "Silva & Souza Advogados" -> SS
   const palavras = nome.split(/\s+/).filter(p => p.length > 2 || /^[A-Z]{2,}$/.test(p));
-  $("#sigla").textContent = !nome ? "PJ" : /^[A-Z]{2,5}$/.test(palavras[0] || "") ? palavras[0].slice(0, 2)
+  $("#sigla").textContent = !nome ? "AU" : /^[A-Z]{2,5}$/.test(palavras[0] || "") ? palavras[0].slice(0, 2)
     : (palavras.slice(0, 2).map(p => p[0]).join("") || nome[0]).toUpperCase();
-  document.title = (nome ? nome + ": " : "") + "Cadastro no PJe";
+  document.title = (nome ? nome + " · " : "") + "Autus";
 }
 $("#ir-cadastro").append(icone("pessoas", 22), h("span", {}, "Cadastro"));
 $("#abrir-relatorio").append(icone("grafico", 22), h("span", {}, "Relatório"));
@@ -1468,7 +1470,7 @@ function assEscritorio() {
       campo("Cor do escritório", seletorDeCor()),
       h("div", {}, h("span", { class: "dica" }, "Assim fica no sistema"),
         h("div", { class: "previa-ass", style: "margin-top:8px" }, sigla,
-          h("div", { class: "nomes" }, nome, h("span", { class: "dica" }, "Cadastro de processos no PJe do TJMT")),
+          h("div", { class: "nomes" }, nome, h("span", { class: "dica" }, "Autus · cadastro de processos no PJe")),
           h("span", { class: "falso-botao" }, "Cadastrar")))),
     rodape: rodapeAss(async () => {
       if (!(cfg.nome || "").trim()) throw new Error("Escreva o nome do escritório.");
@@ -1872,7 +1874,8 @@ function desenharEntrar() {
     try { guardarSessao((await api("/entrar", { email: email.value, senha: senha.value })).sessao); location.reload(); }
     catch (e) { mostrar(e.message); botao.disabled = false; }
   } },
-    h("h1", {}, "Cadastro no PJe"), h("p", { class: "dica", style: "margin:0" }, "Entre com o e-mail e a senha do seu escritório."),
+    h("div", { style: "display:flex;align-items:center;gap:12px" }, h("span", { class: "ass-sigla", "aria-hidden": "true" }, "AU"), h("h1", {}, "Autus")),
+    h("p", { class: "dica", style: "margin:0" }, "Cadastro de processos no PJe. Entre com o e-mail e a senha do seu escritório."),
     campo("E-mail", email), campo("Senha", senha), msg, botao,
     h("button", { class: "link", type: "button", onclick: async () => {
       if (!email.value) return mostrar("Escreva o seu e-mail acima e clique de novo em Esqueci a senha.");
