@@ -98,6 +98,8 @@ def test_publicar_pagina_no_firebase_hosting():
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "servidor", "atualizar.sh"), encoding="utf-8") as f:
         atualizar = f.read()
     assert atualizar.index("publicar_pagina.py") < atualizar.index("systemctl restart porteiro")
+    # depois do git pull, roda a versão nova de si mesmo (a velha não tinha a publicação: endereços em círculo)
+    assert atualizar.index("pull --ff-only") < atualizar.index("exec bash") < atualizar.index("uv pip install")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,11 @@
 set -euo pipefail
 RAIZ=/srv/robo
 cd "$RAIZ"  # sudo mantém a pasta de quem rodou; o usuário robo não lê a pasta pessoal de ninguém
-sudo -u robo git -C $RAIZ/codigo pull --ff-only
+if [ -z "${ATUALIZAR_JA_BAIXOU:-}" ]; then
+  sudo -u robo git -C $RAIZ/codigo pull --ff-only
+  # o bash segue lendo a cópia antiga deste arquivo: roda de novo a versão que acabou de chegar
+  ATUALIZAR_JA_BAIXOU=1 exec bash $RAIZ/codigo/servidor/atualizar.sh
+fi
 sudo -u robo env UV_PYTHON_INSTALL_DIR=/opt/uv-python uv pip install --no-config --python $RAIZ/venv/bin/python -q \
   -r $RAIZ/codigo/servidor/requisitos.txt
 cp $RAIZ/codigo/servidor/robo@.service $RAIZ/codigo/servidor/porteiro.service $RAIZ/codigo/servidor/limpar.service \
