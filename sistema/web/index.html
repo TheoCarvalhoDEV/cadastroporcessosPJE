@@ -6,6 +6,8 @@
 <!-- endereço do servidor quando a página sai do Firebase Hosting (servidor/publicar_pagina.py preenche); vazio: a
      página e o servidor são o mesmo endereço (modo local, ou o próprio servidor) -->
 <meta name="api" content="">
+<!-- ID do cliente OAuth do botão "Fazer login com o Google" (publicar_pagina.py preenche; vazio: sem o botão) -->
+<meta name="google-client" content="">
 <title>Autus</title>
 <link rel="icon" href="data:,">
 <link rel="preload" href="/fontes/plus-jakarta-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -269,6 +271,14 @@
   .faixa-admin .botao { height: 32px; font-size: 13px; }
   .entrar .cartao { width: min(400px, 100%); padding: 32px; display: flex; flex-direction: column; gap: 16px; }
   .entrar h1 { margin: 0; font: 800 22px var(--titulo); }
+  .botao-google { min-height: 44px; display: flex; justify-content: center; }
+  .entrar .ou { display: flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 600; color: var(--tinta-3); }
+  .entrar .ou::before, .entrar .ou::after { content: ""; flex: 1; border-top: 1px solid var(--borda); }
+  .pedidos-adm { display: flex; flex-direction: column; gap: 10px; }
+  .pedido-adm { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border: 1px solid var(--borda); border-radius: 14px; }
+  .pedido-adm .quem { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 2px; }
+  .pedido-adm .quem span { font-size: 12px; color: var(--tinta-3); }
+  .pedido-adm select { width: auto; min-width: 200px; height: 40px; }
   .entrar .link { background: none; border: 0; padding: 0; color: var(--cor); font-weight: 600; cursor: pointer; text-align: left; }
   .busca { position: relative; margin: 0 20px 16px; }
   .busca > span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--tinta-3); pointer-events: none; }
@@ -1875,7 +1885,9 @@ function desenharEntrar() {
     catch (e) { mostrar(e.message); botao.disabled = false; }
   } },
     h("div", { style: "display:flex;align-items:center;gap:12px" }, h("span", { class: "ass-sigla", "aria-hidden": "true" }, "AU"), h("h1", {}, "Autus")),
-    h("p", { class: "dica", style: "margin:0" }, "Cadastro de processos no PJe. Entre com o e-mail e a senha do seu escritório."),
+    h("p", { class: "dica", style: "margin:0" }, GOOGLE_CLIENT ? "Cadastro de processos no PJe. Entre com a sua conta Google ou com e-mail e senha."
+      : "Cadastro de processos no PJe. Entre com o e-mail e a senha do seu escritório."),
+    GOOGLE_CLIENT ? [botaoGoogle(mostrar), h("div", { class: "ou" }, "ou")] : null,
     campo("E-mail", email), campo("Senha", senha), msg, botao,
     h("button", { class: "link", type: "button", onclick: async () => {
       if (!email.value) return mostrar("Escreva o seu e-mail acima e clique de novo em Esqueci a senha.");
@@ -1883,6 +1895,24 @@ function desenharEntrar() {
       catch (e) { mostrar(e.message); }
     } }, "Esqueci a senha")));
   email.focus();
+}
+// "Fazer login com o Google": o botão oficial do Google (Google Identity Services) devolve um token assinado pelo
+// Google; o porteiro confere e, se a conta não estiver liberada, guarda um pedido de acesso para o administrador
+const GOOGLE_CLIENT = (document.querySelector('meta[name="google-client"]') || {}).content || "";
+function botaoGoogle(mostrar) {
+  const caixa = h("div", { class: "botao-google", "aria-live": "polite" });
+  const desenhar = () => {
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT, ux_mode: "popup", auto_select: false, callback: async resposta => {
+      try { guardarSessao((await api("/entrar-google", { credencial: resposta.credential })).sessao); location.reload(); }
+      catch (e) { mostrar(e.message, e.dados && e.dados.pedido); }
+    } });
+    google.accounts.id.renderButton(caixa, { type: "standard", theme: "outline", size: "large", text: "signin_with",
+      shape: "rectangular", logo_alignment: "center", locale: "pt-BR", width: Math.min(caixa.clientWidth || 336, 400) });
+  };
+  if (window.google && google.accounts) setTimeout(desenhar);
+  else document.head.append(h("script", { src: "https://accounts.google.com/gsi/client", async: true,
+    onload: desenhar, onerror: () => encher(caixa, h("p", { class: "dica" }, "Não consegui carregar o botão do Google. Use e-mail e senha.")) }));
+  return caixa;
 }
 // link do e-mail "criar senha" (servidor): o porteiro troca a senha com o código do link
 function desenharNovaSenha() {
@@ -2034,7 +2064,28 @@ async function desenharEscritorios() {
         } }, novo, h("button", { class: "botao", type: "submit" }, "Liberar e mandar o link")));
   };
   const registro = h("ol", {});
+  // quem entrou com o Google e ainda não tem acesso: escolher o escritório e liberar (ou recusar)
+  const pedido = p => {
+    const qual = h("select", { "aria-label": `Escritório para ${p.email}` }, h("option", { value: "" }, "Escolha o escritório"),
+      r.escritorios.map(e => h("option", { value: e.id }, e.nome)));
+    const agir = async (url, corpo, texto) => {
+      try { await api(url, corpo); informar(texto); desenharAdmin(); } catch (x) { avisar(x.message); }
+    };
+    return h("div", { class: "pedido-adm" },
+      h("div", { class: "quem" }, h("strong", {}, p.nome || p.email), h("span", {}, `${p.nome ? p.email + " · " : ""}pediu em ${dataCurta(p.quando)}`)),
+      qual,
+      h("button", { class: "botao principal", type: "button", onclick: () => {
+          if (!qual.value) return avisar("Escolha em qual escritório liberar.");
+          agir("/admin/pedidos/liberar", { email: p.email, escritorio: qual.value }, `${p.email} liberado: já pode entrar com o Google.`);
+        } }, "Liberar"),
+      h("button", { class: "botao", type: "button", onclick: () => confirm(`Recusar o pedido de ${p.email}?`)
+          && agir("/admin/pedidos/recusar", { email: p.email }, `Pedido de ${p.email} recusado.`) }, "Recusar"));
+  };
   encher(caixa, h("div", { id: "form-novo" }),
+    r.pedidos && r.pedidos.length ? h("section", { class: "cartao rel-bloco" },
+      h("div", { class: "esc-topo" }, h("h2", {}, "Pedidos de acesso"), h("span", { class: "pilula alerta" }, h("span", { class: "ponto" }), String(r.pedidos.length))),
+      h("p", { class: "intro" }, "Pessoas que entraram com a conta Google e ainda não têm acesso. Libere só quem você conhece."),
+      h("div", { class: "pedidos-adm" }, r.pedidos.map(pedido))) : null,
     r.escritorios.length ? r.escritorios.map(cartao) : h("div", { class: "cartao rel-bloco dica" }, "Nenhum escritório ainda. Clique em Escritório novo."),
     h("details", { class: "cartao rel-bloco registro-adm", ontoggle: async ev => {
         if (!ev.target.open || registro.childElementCount) return;

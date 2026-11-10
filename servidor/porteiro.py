@@ -26,6 +26,9 @@ RAIZ = os.environ.get("ROBO_RAIZ", "/srv/robo")
 ARQUIVO_ESCRITORIOS = os.path.join(RAIZ, "escritorios.json")
 ARQUIVO_ENCERRADAS = os.path.join(RAIZ, "sessoes_encerradas.json")  # quem clicou em Sair: a chave não vale mais
 ARQUIVO_AUDITORIA = os.path.join(RAIZ, "auditoria.jsonl")  # tudo o que um administrador faz (e em qual escritório)
+ARQUIVO_PEDIDOS = os.path.join(RAIZ, "pedidos_acesso.json")  # quem entrou com o Google e ainda não foi liberado
+GOOGLE_CLIENT = os.environ.get("ROBO_GOOGLE_CLIENT", "")  # ID do cliente OAuth do botão "Fazer login com o Google"
+MAX_PEDIDOS = 300  # a lista de pedidos não cresce sem fim (qualquer conta Google pode pedir)
 LIGAR_ESCRITORIO = ["sudo", "-n", "/usr/local/sbin/autus-ligar-escritorio"]  # ligar_escritorio.sh, dono root
 API_KEY = os.environ["FIREBASE_API_KEY"]
 PORTA = int(os.environ.get("ROBO_PORTA_PORTEIRO", 8800))
@@ -45,6 +48,7 @@ app.config.update(MAX_CONTENT_LENGTH=210 * 1024 * 1024)  # o robô do escritóri
 assinador = URLSafeTimedSerializer(os.environ["ROBO_CHAVE_SESSAO"], salt="sessao")
 trava_encerradas = threading.Lock()
 trava_escritorios = threading.Lock()  # o administrador muda o escritorios.json pela página
+trava_pedidos = threading.Lock()
 
 
 # ---------- escritórios e Firebase ----------
@@ -259,6 +263,66 @@ def entrar():
     return jsonify(ok=True, sessao=nova_sessao(email))
 
 
+def conferir_google(credencial):
+    """{"email", "nome"} da conta Google do botão "Fazer login com o Google", ou None. Confere a assinatura do Google,
+    para quem o token foi feito (GOOGLE_CLIENT), a validade e se o Google confirmou o e-mail."""
+    from google.auth.transport import requests as transporte
+    from google.oauth2 import id_token
+    try:
+        dados = id_token.verify_oauth2_token(credencial, transporte.Request(), GOOGLE_CLIENT)
+    except ValueError:  # assinatura, emissor, destinatário ou validade errados
+        return None
+    if not dados.get("email_verified") or not dados.get("email"):
+        return None
+    return {"email": dados["email"].strip().lower(), "nome": str(dados.get("name", ""))[:120]}
+
+
+def ler_pedidos():
+    try:
+        with open(ARQUIVO_PEDIDOS, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, ValueError):
+        return {}
+
+
+def gravar_pedidos(pedidos):
+    with open(ARQUIVO_PEDIDOS + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(pedidos, f, ensure_ascii=False, indent=2)
+    os.replace(ARQUIVO_PEDIDOS + ".tmp", ARQUIVO_PEDIDOS)
+
+
+def registrar_pedido(email, nome):
+    """Conta Google que ainda não foi liberada: fica esperando o administrador (um pedido por e-mail)."""
+    with trava_pedidos:
+        pedidos = ler_pedidos()
+        if email in pedidos or len(pedidos) >= MAX_PEDIDOS:
+            return
+        pedidos[email] = {"nome": nome, "quando": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        gravar_pedidos(pedidos)
+
+
+@app.post("/entrar-google")
+def entrar_google():
+    """Login pelo botão do Google. Liberado (escritório ou administrador): entra. Senão: vira pedido de acesso."""
+    if not GOOGLE_CLIENT:
+        return jsonify(erro="O login com o Google não está ligado."), 404
+    credencial = str((request.get_json(silent=True) or {}).get("credencial", ""))
+    try:
+        quem = conferir_google(credencial) if credencial else None
+    except Exception:  # sem rede para buscar as chaves do Google
+        return jsonify(erro="Não consegui falar com o Google. Tente de novo em instantes."), 502
+    if not quem:
+        return jsonify(erro="Não consegui confirmar a sua conta Google. Tente de novo."), 401
+    email = quem["email"]
+    if escritorio_do_email(email) or eh_admin(email):
+        if eh_admin(email):
+            auditar(email, "entrou (Google)")
+        return jsonify(ok=True, sessao=nova_sessao(email))
+    registrar_pedido(email, quem["nome"])
+    return jsonify(erro=f"A conta {email} ainda não tem acesso. O pedido foi enviado ao administrador do Autus: "
+                        "assim que o acesso for liberado, é só entrar de novo com o Google.", pedido=True), 403
+
+
 @app.get("/eu")
 def eu():
     """Quem está na página: administrador vê a tela de Escritórios antes de abrir um."""
@@ -346,7 +410,42 @@ def admin_escritorios():
     dados = ler_escritorios()
     lista = [{"id": id_, "nome": e["nome"], "emails": e["emails"], "robo": situacao_do_robo(e["porta"])}
              for id_, e in sorted(dados["escritorios"].items(), key=lambda par: par[1]["nome"].lower())]
-    return jsonify(escritorios=lista, admins=dados.get("admins", []))
+    return jsonify(escritorios=lista, admins=dados.get("admins", []), google=bool(GOOGLE_CLIENT),
+                   pedidos=sorted(({"email": e, **p} for e, p in ler_pedidos().items()), key=lambda p: p["quando"]))
+
+
+@app.post("/admin/pedidos/liberar")
+def admin_liberar_pedido():
+    """Pedido de acesso (login com o Google) liberado num escritório: a pessoa entra de novo com o Google."""
+    email_admin = admin_da_sessao()
+    corpo = request.get_json(silent=True) or {}
+    email, id_ = str(corpo.get("email", "")).strip().lower(), str(corpo.get("escritorio", ""))
+    with trava_escritorios:
+        if id_ not in ler_escritorios()["escritorios"]:
+            return jsonify(erro="Escolha o escritório."), 400
+        try:
+            escritorio_novo.adicionar(ARQUIVO_ESCRITORIOS, id_, "", [email])
+        except SystemExit as e:
+            return jsonify(erro=str(e)), 400
+    with trava_pedidos:
+        pedidos = ler_pedidos()
+        pedidos.pop(email, None)
+        gravar_pedidos(pedidos)
+    auditar(email_admin, "liberou pedido de acesso (Google)", escritorio=id_, emails=[email])
+    return jsonify(ok=True)
+
+
+@app.post("/admin/pedidos/recusar")
+def admin_recusar_pedido():
+    email_admin = admin_da_sessao()
+    email = str((request.get_json(silent=True) or {}).get("email", "")).strip().lower()
+    with trava_pedidos:
+        pedidos = ler_pedidos()
+        if pedidos.pop(email, None) is None:
+            return jsonify(erro="Esse pedido não existe mais."), 404
+        gravar_pedidos(pedidos)
+    auditar(email_admin, "recusou pedido de acesso (Google)", emails=[email])
+    return jsonify(ok=True)
 
 
 @app.post("/admin/abrir")

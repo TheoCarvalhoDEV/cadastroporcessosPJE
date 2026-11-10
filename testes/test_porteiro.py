@@ -203,6 +203,79 @@ def test_erros_de_todos_os_escritorios():
     assert web.get("/admin/erros", headers=chave(web, "ana@x.com")).status_code == 403
 
 
+def test_login_com_o_google_e_pedidos_de_acesso():
+    """Conta Google liberada entra; a que não está vira pedido de acesso, que o administrador libera ou recusa."""
+    porteiro.escritorio_novo.gravar(porteiro.ARQUIVO_ESCRITORIOS, {"escritorios": {
+        "alfa": {"nome": "Alfa", "porta": servidor.server_port, "emails": ["ana@x.com"]}}, "admins": ["chefe@x.com"]})
+    if os.path.exists(porteiro.ARQUIVO_PEDIDOS):
+        os.remove(porteiro.ARQUIVO_PEDIDOS)
+    web = porteiro.app.test_client()
+    contas = {"t-ana": {"email": "ana@x.com", "nome": "Ana"}, "t-chefe": {"email": "chefe@x.com", "nome": "Chefe"},
+              "t-novo": {"email": "novo@gmail.com", "nome": "Novo Advogado"}}
+    entrar_g = lambda token: web.post("/entrar-google", json={"credencial": token})
+    with mock.patch.object(porteiro, "GOOGLE_CLIENT", ""):
+        assert entrar_g("t-ana").status_code == 404  # sem o ID do cliente OAuth, o botão não existe
+    with mock.patch.object(porteiro, "GOOGLE_CLIENT", "123-abc.apps.googleusercontent.com"), \
+         mock.patch.object(porteiro, "conferir_google", lambda t: contas.get(t)):
+        assert entrar_g("falso").status_code == 401 and entrar_g("").status_code == 401
+        r = entrar_g("t-ana")
+        assert r.status_code == 200 and web.get("/api/eco", headers={"Authorization": "Bearer " + r.get_json()["sessao"]}).status_code == 200
+        assert entrar_g("t-chefe").status_code == 200  # administrador sem escritório também entra
+        r = entrar_g("t-novo")
+        assert r.status_code == 403 and r.get_json()["pedido"] is True and "administrador" in r.get_json()["erro"]
+        entrar_g("t-novo")  # de novo: continua um pedido só
+        chefe = chave(web, "chefe@x.com")
+        lista = web.get("/admin/escritorios", headers=chefe).get_json()
+        assert [(p["email"], p["nome"]) for p in lista["pedidos"]] == [("novo@gmail.com", "Novo Advogado")] and lista["google"] is True
+        ana = chave(web, "ana@x.com")
+        for url in ("/admin/pedidos/liberar", "/admin/pedidos/recusar"):
+            assert web.post(url, json={"email": "novo@gmail.com", "escritorio": "alfa"}, headers=ana).status_code == 403
+        assert web.post("/admin/pedidos/liberar", json={"email": "novo@gmail.com", "escritorio": "naoexiste"}, headers=chefe).status_code == 400
+        assert web.post("/admin/pedidos/liberar", json={"email": "novo@gmail.com", "escritorio": "alfa"}, headers=chefe).status_code == 200
+        assert "novo@gmail.com" in porteiro.escritorio_novo.ler(porteiro.ARQUIVO_ESCRITORIOS)["escritorios"]["alfa"]["emails"]
+        assert web.get("/admin/escritorios", headers=chefe).get_json()["pedidos"] == []
+        assert entrar_g("t-novo").status_code == 200  # liberado: agora entra
+        contas["t-outro"] = {"email": "outro@gmail.com", "nome": ""}
+        entrar_g("t-outro")
+        assert web.post("/admin/pedidos/recusar", json={"email": "outro@gmail.com"}, headers=chefe).status_code == 200
+        assert web.post("/admin/pedidos/recusar", json={"email": "outro@gmail.com"}, headers=chefe).status_code == 404
+        with mock.patch.object(porteiro, "MAX_PEDIDOS", 0):
+            contas["t-spam"] = {"email": "spam@gmail.com", "nome": ""}
+            entrar_g("t-spam")
+        assert porteiro.ler_pedidos() == {}  # a lista não cresce sem fim
+    acoes = [l["acao"] for l in web.get("/admin/registro", headers=chave(web, "chefe@x.com")).get_json()["registro"]]
+    assert "liberou pedido de acesso (Google)" in acoes and "recusou pedido de acesso (Google)" in acoes and "entrou (Google)" in acoes
+
+
+def test_conferir_google_exige_email_confirmado():
+    """O token do Google é conferido pela biblioteca do Google (assinatura, destinatário, validade) e o e-mail tem de
+    estar confirmado pelo Google."""
+    import types
+    respostas = []
+    oauth2 = types.ModuleType("google.oauth2")
+    id_token = types.ModuleType("google.oauth2.id_token")
+    def verificar(token, pedido, cliente):
+        assert cliente == "123-abc.apps.googleusercontent.com"
+        if respostas[0] is ValueError:
+            raise ValueError("assinatura errada")
+        return respostas[0]
+    id_token.verify_oauth2_token = verificar
+    oauth2.id_token = id_token
+    transporte = types.ModuleType("google.auth.transport.requests")
+    transporte.Request = lambda: None
+    falsos = {"google": types.ModuleType("google"), "google.oauth2": oauth2, "google.oauth2.id_token": id_token,
+              "google.auth": types.ModuleType("google.auth"), "google.auth.transport": types.ModuleType("google.auth.transport"),
+              "google.auth.transport.requests": transporte}
+    falsos["google.auth.transport"].requests = transporte
+    falsos["google.auth"].transport = falsos["google.auth.transport"]
+    falsos["google"].auth, falsos["google"].oauth2 = falsos["google.auth"], oauth2
+    with mock.patch.dict(sys.modules, falsos), mock.patch.object(porteiro, "GOOGLE_CLIENT", "123-abc.apps.googleusercontent.com"):
+        for resposta, esperado in (({"email": "Ana@X.com", "email_verified": True, "name": "Ana"}, {"email": "ana@x.com", "nome": "Ana"}),
+                                   ({"email": "ana@x.com", "email_verified": False}, None), (ValueError, None)):
+            respostas[:] = [resposta]
+            assert porteiro.conferir_google("token") == esperado, resposta
+
+
 def test_criar_senha_pelo_link_do_email():
     """O link do e-mail do Firebase aponta para /nova-senha do próprio robô (a página do Firebase vinha sem a chave)."""
     web = porteiro.app.test_client()

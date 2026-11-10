@@ -132,6 +132,12 @@ def test_publicar_pagina_no_firebase_hosting():
     assert len(enviados) == 1 and api.encode() in gzip.decompress(enviados[0][2])
     assert [c[:2] for c in chamadas[-2:]] == [("PATCH", "sites/autus/versions/v1?update_mask=status"),
                                               ("POST", "sites/autus/releases?versionName=sites/autus/versions/v1")]
+    # com o login do Google: o ID vai para a página e a política de segurança libera só o botão oficial do Google
+    pagina = publicar_pagina.arquivos(api, "123-abc.apps.googleusercontent.com")["/index.html"].decode("utf-8")
+    assert '<meta name="google-client" content="123-abc.apps.googleusercontent.com">' in pagina
+    com_google = publicar_pagina.configuracao(api, True)["headers"][0]["headers"]["Content-Security-Policy"]
+    assert "script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client" in com_google
+    assert "frame-src https://accounts.google.com/gsi/" in com_google and "frame-src 'none'" in politica
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "servidor", "atualizar.sh"), encoding="utf-8") as f:
         atualizar = f.read()
     assert atualizar.index("publicar_pagina.py") < atualizar.index("systemctl restart porteiro")

@@ -7,19 +7,24 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import sys
 import urllib.request
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sistema", "web")
 HOSTING = "https://firebasehosting.googleapis.com/v1beta1/"
 META_VAZIA = '<meta name="api" content="">'
+META_GOOGLE = '<meta name="google-client" content="">'  # ID do cliente OAuth do botão do Google (vazio: sem botão)
 
 
-def configuracao(api):
-    """Regras do site: toda rota mostra a página (ex.: /nova-senha do e-mail), cabeçalhos de segurança e cache."""
+def configuracao(api, google=False):
+    """Regras do site: toda rota mostra a página (ex.: /nova-senha do e-mail), cabeçalhos de segurança e cache.
+    Com o login do Google, libera só o que o botão oficial do Google usa (accounts.google.com/gsi)."""
+    gsi = " https://accounts.google.com/gsi/" if google else ""
     politica = "; ".join([
-        "default-src 'self'", f"connect-src 'self' {api}", "img-src 'self' data: blob:",
-        "style-src 'self' 'unsafe-inline'", "script-src 'self' 'unsafe-inline'", "font-src 'self'",
+        "default-src 'self'", f"connect-src 'self' {api}{gsi}", "img-src 'self' data: blob:" + (" https://*.googleusercontent.com" if google else ""),
+        f"style-src 'self' 'unsafe-inline'{gsi}", f"script-src 'self' 'unsafe-inline'{' https://accounts.google.com/gsi/client' if google else ''}",
+        "font-src 'self'", f"frame-src{gsi}" if google else "frame-src 'none'",
         "frame-ancestors 'none'", "base-uri 'none'", "form-action 'self'", "object-src 'none'"])
     seguranca = {"Content-Security-Policy": politica, "X-Content-Type-Options": "nosniff",
                  "Referrer-Policy": "no-referrer", "Strict-Transport-Security": "max-age=31536000",
@@ -29,13 +34,16 @@ def configuracao(api):
                         {"glob": "/fontes/**", "headers": {"Cache-Control": "public, max-age=31536000, immutable"}}]}
 
 
-def arquivos(api):
-    """{caminho no site: bytes}: a página com o endereço do servidor e as fontes."""
+def arquivos(api, google_client=""):
+    """{caminho no site: bytes}: a página com o endereço do servidor (e o ID do botão do Google) e as fontes."""
     with open(os.path.join(WEB, "index.html"), encoding="utf-8") as f:
         pagina = f.read()
-    if META_VAZIA not in pagina:
-        raise SystemExit("index.html sem a linha " + META_VAZIA)
-    saida = {"/index.html": pagina.replace(META_VAZIA, f'<meta name="api" content="{api}">').encode("utf-8")}
+    for meta in (META_VAZIA, META_GOOGLE):
+        if meta not in pagina:
+            raise SystemExit("index.html sem a linha " + meta)
+    pagina = pagina.replace(META_VAZIA, f'<meta name="api" content="{api}">')
+    pagina = pagina.replace(META_GOOGLE, f'<meta name="google-client" content="{google_client}">')
+    saida = {"/index.html": pagina.encode("utf-8")}
     for nome in sorted(os.listdir(os.path.join(WEB, "fontes"))):
         if nome.endswith(".woff2"):
             with open(os.path.join(WEB, "fontes", nome), "rb") as f:
@@ -59,10 +67,10 @@ def chamar(token, metodo, url, corpo=None, tipo="application/json"):
         return json.loads(texto) if texto else {}
 
 
-def publicar(site, api, token):
-    comprimidos = {caminho: gzip.compress(conteudo, mtime=0) for caminho, conteudo in arquivos(api).items()}
+def publicar(site, api, token, google_client=""):
+    comprimidos = {caminho: gzip.compress(conteudo, mtime=0) for caminho, conteudo in arquivos(api, google_client).items()}
     resumos = {caminho: hashlib.sha256(c).hexdigest() for caminho, c in comprimidos.items()}
-    versao = chamar(token, "POST", f"sites/{site}/versions", {"config": configuracao(api)})["name"]
+    versao = chamar(token, "POST", f"sites/{site}/versions", {"config": configuracao(api, bool(google_client))})["name"]
     pedido = chamar(token, "POST", f"{versao}:populateFiles", {"files": resumos})
     faltam = set(pedido.get("uploadRequiredHashes", []))
     for caminho, resumo in resumos.items():
@@ -78,5 +86,8 @@ if __name__ == "__main__":
     if not site or not api.startswith("https://"):
         sys.exit("Faltam ROBO_SITE e ROBO_API (https://...) para publicar a página no Firebase Hosting.")
     token = sys.argv[sys.argv.index("--token") + 1] if "--token" in sys.argv else token_da_maquina()
-    enviados = publicar(site, api, token)
+    google_client = os.environ.get("ROBO_GOOGLE_CLIENT", "").strip()
+    if google_client and not re.fullmatch(r"[0-9a-z-]+\.apps\.googleusercontent\.com", google_client):
+        sys.exit("ROBO_GOOGLE_CLIENT não parece um ID de cliente OAuth do Google (termina em .apps.googleusercontent.com).")
+    enviados = publicar(site, api, token, google_client)
     print(f"Página publicada em https://{site}.web.app ({enviados} arquivo(s) novo(s)), falando com {api}")
