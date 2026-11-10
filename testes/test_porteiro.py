@@ -247,6 +247,11 @@ def test_email_de_criar_senha_vai_com_a_conta_da_maquina():
     assert pedidos[0].get_header("Authorization") == "Bearer TOKEN" and "sendOobCode" in pedidos[0].full_url
     assert pedidos[1].get_header("Authorization") is None  # o login da pessoa não usa a conta da máquina
     assert pedidos[2].get_header("Authorization") == "Bearer TOKEN" and "signUp" in pedidos[2].full_url
+    assert "continueUrl" not in json.loads(pedidos[0].data)  # sem site do Firebase Hosting, sem botão Continuar
+    with mock.patch.object(porteiro, "token_da_maquina", lambda: "TOKEN"), \
+         mock.patch.object(porteiro.urllib.request, "urlopen", abrir), mock.patch.object(porteiro, "PAGINA", "https://autus.web.app"):
+        porteiro.pedir_nova_senha("a@x.com")
+    assert json.loads(pedidos[3].data)["continueUrl"] == "https://autus.web.app/"  # Continuar leva ao Autus
     senha = json.loads(pedidos[2].data)["password"]
     assert len(senha) >= 10 and any(c.isdigit() for c in senha)  # a senha provisória cumpre a regra de senha
 

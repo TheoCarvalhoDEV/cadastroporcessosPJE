@@ -123,9 +123,12 @@ def entrar_no_firebase(email, senha):
 
 
 def pedir_nova_senha(email):
-    """O Firebase manda o e-mail de criar senha nova. Não diz se o e-mail existe."""
+    """O Firebase manda o e-mail de criar senha nova. Não diz se o e-mail existe. Com a página no Firebase Hosting, a
+    página de criar senha do Firebase termina com um botão Continuar que leva para ela (o link do e-mail não dá
+    para mudar: o Firebase bloqueia os modelos de e-mail deste projeto sem domínio próprio)."""
+    corpo = {"requestType": "PASSWORD_RESET", "email": email, **({"continueUrl": PAGINA + "/"} if PAGINA else {})}
     try:
-        firebase("sendOobCode", {"requestType": "PASSWORD_RESET", "email": email}, como_maquina=True)
+        firebase("sendOobCode", corpo, como_maquina=True)
     except Exception:
         pass
 
