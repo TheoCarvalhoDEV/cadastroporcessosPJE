@@ -1,4 +1,7 @@
-ROBÔ DE CADASTRO NO PJe - o que é cada coisa
+AUTUS - ROBÔ DE CADASTRO NO PJe - o que é cada coisa
+
+O que já foi feito e o que falta: docs\ESTADO-DO-PROJETO.md
+Os clientes usam: https://autus.web.app (o robô roda na nuvem, ver NO SERVIDOR).
 
 PARA USAR
   Abrir cadastro.bat        -> ABRA ESTE (dois cliques). Liga o programa e abre a tela no navegador
@@ -44,15 +47,24 @@ PASTAS DE CLIENTES (na pasta escolhida em Configurações; padrão: a pasta que 
 NO SERVIDOR (o escritório usa só o navegador; projeto: docs\superpowers\specs\2026-11-09-robo-na-nuvem-design.md)
   Uma máquina Ubuntu do Google em São Paulo roda um robô (app_web.py) por escritório, com as variáveis ROBO_* do
   modo servidor: pastas dos clientes enviadas pela página, login do PJe no Secret Manager, Chrome sem janela.
-  servidor\porteiro.py         login (Firebase) e repasse para o robô de cada escritório. Ninguém vê outro escritório.
-  servidor\montar.sh           monta a máquina:  sudo bash montar.sh <dominio> <chave-de-api-do-firebase>
-  servidor\escritorio_novo.py  escritório novo (ou mais e-mails num que existe):
+  A página fica em https://autus.web.app (Firebase Hosting) e fala com o servidor por trás.
+  servidor\porteiro.py         login (Firebase e "Fazer login com o Google"), chave de sessão, pedidos de acesso,
+                               painel do administrador (Escritórios, Erros, registro) e repasse para o robô de cada
+                               escritório. Ninguém vê outro escritório.
+  servidor\publicar_pagina.py  publica a página, a Política de Privacidade e os Termos no Firebase Hosting.
+  servidor\ligar_escritorio.sh liga o robô de um escritório novo (a única parte com root; o porteiro chama com sudo).
+  servidor\montar.sh           monta a máquina:  sudo bash montar.sh <dominio> <chave-de-api-do-firebase> [site]
+  servidor\escritorio_novo.py  escritório novo (ou mais e-mails num que existe); o administrador também faz isso
+                               pela página, em Escritórios:
                                  sudo /srv/robo/venv/bin/python /srv/robo/codigo/servidor/escritorio_novo.py jvo "JVO" a@b.com
-                               cada e-mail recebe o link para criar a senha.
-  servidor\atualizar.sh        pega o código novo do GitHub e reinicia cada robô quando ele estiver parado.
+                               cada e-mail recebe o link para criar a senha. Administrador do Autus (só por aqui):
+                                 sudo /srv/robo/venv/bin/python /srv/robo/codigo/servidor/escritorio_novo.py --admin a@b.com
+  servidor\atualizar.sh        pega o código novo do GitHub, reinicia cada robô quando ele estiver parado, publica a
+                               página no Firebase e reinicia o porteiro.
   servidor\limpar.py           todo dia apaga o que passou de 30 dias em Concluído, Lixeira e fotos das pausas.
   servidor\*.service, *.timer, Caddyfile   serviços da máquina e o HTTPS.
-  No servidor: /srv/robo/escritorios.json (e-mail -> escritório) e /srv/robo/escritorios/<id>/ (dados e clientes).
+  No servidor: /srv/robo/escritorios.json (e-mail -> escritório e administradores), /srv/robo/escritorios/<id>/
+  (dados e clientes), auditoria.jsonl (ações do administrador) e pedidos_acesso.json (login com o Google à espera).
   Senhas e chaves ficam em /srv/robo/*.env, nunca no GitHub.
 
 PARA LEVAR A OUTRO ESCRITÓRIO
