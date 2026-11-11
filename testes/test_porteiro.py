@@ -26,6 +26,11 @@ def eco():
             "tamanho": len(request.get_data()), "cookie": request.headers.get("Cookie", "")}
 
 
+@falso.route("/api/autenticador/qr")
+def qr():
+    return {"qr": "data:image/png;base64,x", "chave": "ABCD EFGH"}
+
+
 @falso.route("/api/clientes/<path:nome>")
 def cliente(nome):
     return {"nome": nome, "query": request.query_string.decode()}
@@ -98,6 +103,19 @@ def test_sair_encerra_a_chave():
     assert web.get("/api/eco", headers=ana).status_code == 401  # a chave de quem saiu não vale mais
     assert web.get("/api/eco", headers=outra).status_code == 200  # o outro navegador continua
     assert web.post("/sair").status_code == 200  # sair sem chave não dá erro
+
+
+def test_qr_do_autenticador_so_logo_depois_de_entrar():
+    """A chave do código do PJe não sai para um computador esquecido aberto: só até 5 min depois do login."""
+    gravar_escritorios(teste={"nome": "Teste", "porta": servidor.server_port, "emails": ["ana@x.com"]})
+    web = porteiro.app.test_client()
+    ana = chave(web, "ana@x.com")
+    assert web.get("/api/autenticador/qr", headers=ana).get_json()["chave"] == "ABCD EFGH"
+    with mock.patch.object(porteiro, "VALIDADE_QR", -1):  # "entrou faz tempo"
+        for caminho in ("/api/autenticador/qr", "/api/autenticador/qr/", "/api/autenticador%2Fqr"):
+            r = web.get(caminho, headers=ana)
+            assert r.status_code == 403 and r.get_json()["reconfirmar"] is True, caminho
+        assert web.get("/api/eco", headers=ana).status_code == 200  # o resto continua
 
 
 def test_pagina_no_firebase_hosting():

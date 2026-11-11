@@ -77,6 +77,11 @@
   <ul>
     <li><strong>Google Cloud e Firebase (Google):</strong> hospedam o servidor, a página e o login. O servidor e os
       dados ficam no Brasil (São Paulo).</li>
+    <li><strong>Leitura da petição pela IA (Gemini, do Google, no Vertex AI):</strong> para preencher a ficha do cliente,
+      a petição inicial é enviada à inteligência artificial do Google, que devolve os dados (partes, documentos,
+      endereço, valor da causa, pedidos). O processamento pode acontecer fora do Brasil. É um serviço pago do Google
+      Cloud: o Google não usa as petições nem as respostas para treinar ou melhorar os modelos dele. A leitura fica
+      guardada junto da pasta do cliente e segue o mesmo prazo de guarda das pastas.</li>
     <li><strong>Tribunal (PJe):</strong> os dados do processo são enviados ao PJe do tribunal, porque é para isso que o
       escritório usa o Autus.</li>
   </ul>

@@ -37,6 +37,7 @@ SITE = os.environ.get("ROBO_SITE", "")  # o site do Firebase Hosting onde a pág
 PAGINA = f"https://{SITE}.web.app" if SITE else ""
 ORIGENS = {PAGINA, f"https://{SITE}.firebaseapp.com"} if SITE else set()  # quem pode chamar o servidor de fora
 VALIDADE_SESSAO = 12 * 3600  # 12 h desde o login
+VALIDADE_QR = 5 * 60  # o QR do autenticador (a chave do código do PJe) só sai até 5 min depois de entrar
 # a regra de senha fica no Firebase (Authentication > Settings > Password policy): mínimo 10 e pelo menos um número
 REGRA_DA_SENHA = "A senha precisa de pelo menos 10 caracteres, com pelo menos um número."
 
@@ -153,15 +154,16 @@ def nova_sessao(email):
 
 
 def ler_sessao():
-    """{"email", "id"} da chave do cabeçalho Authorization, ou None (sem chave, alterada, vencida ou encerrada)."""
+    """{"email", "id", "desde"} da chave do cabeçalho Authorization, ou None (sem chave, alterada, vencida ou
+    encerrada). desde: quando a pessoa entrou (segundos)."""
     chave = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
     if not chave:
         return None
     try:
-        dados = assinador.loads(chave, max_age=VALIDADE_SESSAO)
+        dados, desde = assinador.loads(chave, max_age=VALIDADE_SESSAO, return_timestamp=True)
     except BadSignature:  # inclui SignatureExpired
         return None
-    return None if dados.get("id") in encerradas() else dados
+    return None if dados.get("id") in encerradas() else {**dados, "desde": desde.timestamp()}
 
 
 def encerradas():
@@ -370,12 +372,17 @@ def nova_senha():
 
 @app.route("/api/<path:resto>", methods=["GET", "POST"])
 def api(resto):
-    email = (ler_sessao() or {}).get("email")
+    sessao = ler_sessao() or {}
+    email = sessao.get("email")
     escritorio = escritorio_do_pedido(email)
     if not escritorio:
         if eh_admin(email):  # administrador sem escritório aberto (ou um que foi apagado do arquivo)
             return jsonify(erro="Escolha um escritório.", escolher=True), 409
         return jsonify(erro="Entre com seu e-mail e senha.", entrar=True), 401
+    # computador esquecido aberto (ou chave de sessão copiada) não basta para levar a chave do código do PJe
+    if resto.rstrip("/") == "autenticador/qr" and time.time() - sessao["desde"] > VALIDADE_QR:
+        return jsonify(erro="Por segurança, o QR só aparece logo depois de entrar. Saia, entre de novo e abra o QR "
+                            "em até 5 minutos.", reconfirmar=True), 403
     return repassar(escritorio["porta"])
 
 

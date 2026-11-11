@@ -899,6 +899,73 @@ def test_lixeira_e_concluido_fora_da_lista():
     assert [os.path.basename(p) for p in robo.pastas_de_clientes(raiz)] == ["Fulana"]
 
 
+# ---------- leitura da petição pela IA (Gemini no Vertex AI, só no servidor) ----------
+
+def test_leitura_ia_entra_por_cima_das_regras():
+    pasta = tempfile.mkdtemp()
+    pdf = os.path.join(pasta, "Fulana [Ação].pdf")
+    with open(pdf, "wb") as f:
+        f.write(b"%PDF-1.4 teste")
+    regras = {"nome completo": "FULANA DE TAL", "cpf": "", "entidade": "ESTADO DE MATO GROSSO", "cnpj": "",
+              "valor da causa": "1.000,00", "jurisdição": "CUIABÁ JUIZADOS"}
+    robo.gravar_leitura_ia(pdf, {"autor_nome": "FULANA DE TAL SOUZA", "autor_cpf": "111.444.777-35",
+                                 "autor_tipo_pessoa": "FÍSICA", "reu_nome": "ESTADO DE MATO GROSSO",
+                                 "reu_cpf_cnpj": "03.507.415/0007-30", "reu_tipo_pessoa": "ÓRGÃO PÚBLICO",
+                                 "valor_da_causa": "R$ 2.500,50", "justica_gratuita": True, "liminar_ou_tutela": False,
+                                 "autor_endereco": "Rua A, 10, Centro, Cuiabá/MT, CEP 78.000-000"})
+    with mock.patch.object(robo, "identificar", lambda t, n: (dict(regras), {"jurisdição": "pelo endereçamento"})), \
+         mock.patch.object(robo, "texto_da_inicial", lambda c: "texto"), \
+         mock.patch.dict(robo.CNPJ_CONHECIDO, {"ESTADO DE MATO GROSSO": "03.507.415/0002-25"}, clear=True):
+        d = robo.dados_da_inicial(pdf)
+        assert d["nome completo"] == "FULANA DE TAL SOUZA" and d["cpf"] == "111.444.777-35"
+        assert d["valor da causa"] == "2.500,50" and d["endereço"].startswith("Rua A, 10")
+        assert d["justiça gratuita"] == "SIM" and d["pedido de liminar ou antecipação de tutela"] == "NÃO"
+        assert d["cnpj"] == "03.507.415/0002-25"  # réu conhecido do escritório vale mais que o CNPJ da petição
+        assert d["pessoa ativo"] == "FÍSICA" and d["pessoa passivo"] == "ÓRGÃO PÚBLICO"
+        assert d["jurisdição"] == "CUIABÁ JUIZADOS"  # o que a IA não lê continua com as regras
+        motivos = robo.motivos_da_inicial(pdf)
+        assert motivos["nome completo"].startswith("lido pela IA") and motivos["jurisdição"] == "pelo endereçamento"
+        assert robo.estado_ia(pasta) == "lida"
+        robo.gravar_leitura_ia(pdf, {"autor_nome": "FULANA", "autor_cpf": "111.444.777-00"})  # CPF inválido
+        assert robo.dados_da_inicial(pdf)["cpf"] == ""  # não entra: fica o que as regras acharam
+        with open(pdf, "ab") as f:  # o PDF mudou: a leitura antiga não vale mais
+            f.write(b" outra versao")
+        assert robo.dados_da_inicial(pdf)["nome completo"] == "FULANA DE TAL" and robo.estado_ia(pasta) == "pendente"
+
+
+def test_ler_com_ia_manda_o_pdf_para_o_gemini():
+    pasta = tempfile.mkdtemp()
+    pdf = os.path.join(pasta, "Inicial.pdf")
+    with open(pdf, "wb") as f:
+        f.write(b"%PDF-1.4 x")
+    pedidos = []
+
+    class Resposta:
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def read(self, *a):
+            return json.dumps({"candidates": [{"content": {"parts": [{"text": '{"autor_nome": "FULANA"}'}]}}]}).encode()
+
+    def abrir(pedido, timeout=None):
+        pedidos.append(pedido)
+        return Resposta()
+    with mock.patch.object(robo, "token_do_google", lambda: "TOKEN"), mock.patch.object(robo.urllib.request, "urlopen", abrir), \
+         mock.patch.object(robo, "PROJETO", "proj"), mock.patch.object(robo, "MODELO_IA", "gemini-3.8-flash"):
+        assert robo.ler_com_ia(pdf) == {"autor_nome": "FULANA"}
+    pedido = pedidos[0]
+    corpo = json.loads(pedido.data)
+    assert pedido.full_url.endswith("/projects/proj/locations/global/publishers/google/models/gemini-3.8-flash:generateContent")
+    assert pedido.get_header("Authorization") == "Bearer TOKEN"
+    assert corpo["contents"][0]["parts"][0]["inlineData"]["mimeType"] == "application/pdf"
+    assert "autor_cpf" in corpo["generationConfig"]["responseSchema"]["properties"]
+    with mock.patch.object(robo, "token_do_google", lambda: None):  # fora da máquina do Google: avisa, não chama
+        try:
+            robo.ler_com_ia(pdf)
+            assert False
+        except SystemExit:
+            pass
+
+
 if __name__ == "__main__":
     testes = [f for n, f in sorted(globals().items()) if n.startswith("test_")]
     for t in testes:

@@ -14,6 +14,7 @@ import time
 import base64
 import functools
 from urllib.parse import urljoin
+import urllib.request
 import unicodedata
 import docx
 import pyotp
@@ -29,6 +30,10 @@ DADOS = os.environ.get("ROBO_DADOS") or os.path.join(PASTA, "dados_do_escritorio
 ARQUIVO_CONFIG = os.path.join(DADOS, "config.json")    # login do PJe no modo local
 # login do PJe no servidor: um segredo por escritório no Secret Manager (nunca no disco nem nos snapshots)
 SEGREDO = f"projects/{os.environ.get('ROBO_PROJETO', '')}/secrets/pje-login-{os.environ.get('ROBO_ESCRITORIO', '')}"
+# leitura da petição pela IA (Gemini no Vertex AI, endereço global: o Gemini não responde em São Paulo); só no servidor
+PROJETO = os.environ.get("ROBO_PROJETO", "")
+MODELO_IA = os.environ.get("ROBO_IA_MODELO", "gemini-3.8-flash")
+ARQUIVO_LEITURA_IA = "leitura_ia.json"  # na pasta do cliente: a leitura da IA, valendo enquanto o PDF não mudar
 URL_LOGIN = "https://pje.tjmt.jus.br/pje/login.seam"
 # Mesmo link do menu "Processo > Novo processo"
 URL_NOVO_PROCESSO = "https://pje.tjmt.jus.br/pje/Processo/cadastrar.seam?newInstance=true"
@@ -194,14 +199,153 @@ def texto_da_inicial(caminho):
 
 
 def dados_da_inicial(caminho):
-    """O que dá para tirar da petição inicial. O PDF quebra palavras e números com espaços
-    ('013.975.611 -65'), por isso os padrões aceitam espaços e os números são limpos depois."""
-    return identificar(texto_da_inicial(caminho), os.path.basename(caminho))[0]
+    """O que dá para tirar da petição inicial: as regras de texto e, por cima, a leitura da IA (quando já existe para
+    este PDF). O PDF quebra palavras e números com espaços ('013.975.611 -65'), por isso os padrões aceitam espaços
+    e os números são limpos depois. Sem leitura da IA (local, falha, ainda lendo), valem só as regras."""
+    return {**identificar(texto_da_inicial(caminho), os.path.basename(caminho))[0], **dados_da_ia(caminho)}
 
 
 def motivos_da_inicial(caminho):
     """{campo: de onde o robô tirou o valor}, para mostrar na interface."""
-    return identificar(texto_da_inicial(caminho), os.path.basename(caminho))[1]
+    ia = dados_da_ia(caminho)
+    conhecido = formatar_documento(CNPJ_CONHECIDO.get(ia.get("entidade", "").upper(), ""))
+    return {**identificar(texto_da_inicial(caminho), os.path.basename(caminho))[1],
+            **{c: "réu conhecido do escritório" if c == "cnpj" and v == conhecido else "lido pela IA na petição"
+               for c, v in ia.items()}}
+
+
+# ---------- leitura da petição pela IA ----------
+# Cada escritório escreve a petição de um jeito; a IA lê qualquer modelo. O robô continua conferindo (CPF/CNPJ com
+# dígito, valor no formato do PJe, réus conhecidos do escritório) e as regras de texto preenchem o que a IA não lê
+# (jurisdição, competência, classe, assunto: escolhidos entre as opções reais do PJe e o dicionário do escritório).
+
+_TEXTO_IA = lambda d: {"type": "STRING", "nullable": True, "description": d}
+_SIMNAO_IA = lambda d: {"type": "BOOLEAN", "nullable": True, "description": d}
+ESQUEMA_IA = {"type": "OBJECT", "required": ["autor_nome", "reu_nome", "valor_da_causa"], "properties": {
+    "autor_nome": _TEXTO_IA("nome completo do autor/requerente"),
+    "autor_cpf": _TEXTO_IA("CPF ou CNPJ do autor como aparece"),
+    "autor_tipo_pessoa": {"type": "STRING", "enum": ["FÍSICA", "JURÍDICA"]},
+    "autor_endereco": _TEXTO_IA("endereço completo do autor (rua, número, bairro, cidade/UF, CEP)"),
+    "reu_nome": _TEXTO_IA("nome do réu/requerido como deve ir ao PJe"),
+    "reu_cpf_cnpj": _TEXTO_IA("CPF ou CNPJ do réu, se a petição trouxer"),
+    "reu_tipo_pessoa": {"type": "STRING", "enum": ["FÍSICA", "JURÍDICA", "ÓRGÃO PÚBLICO"]},
+    "enderecamento": _TEXTO_IA("a frase de endereçamento do início da petição, literal"),
+    "grau": {"type": "STRING", "enum": ["1º grau", "2º grau"],
+             "description": "Juiz de Direito/Juizado/Vara = 1º grau; Desembargador/Tribunal/Câmara = 2º grau"},
+    "comarca": _TEXTO_IA("comarca"), "juizo": _TEXTO_IA("juízo, ex.: Juizado Especial da Fazenda Pública, Vara Cível"),
+    "nome_da_acao": _TEXTO_IA("nome da ação como a petição chama"),
+    "valor_da_causa": _TEXTO_IA("valor da causa em reais, como na petição"),
+    "justica_gratuita": _SIMNAO_IA("pede justiça gratuita?"),
+    "liminar_ou_tutela": _SIMNAO_IA("pede liminar ou tutela de urgência/antecipada?"),
+    "segredo_de_justica": _SIMNAO_IA("pede segredo de justiça?"),
+    "prioridade": _TEXTO_IA("prioridade de tramitação pedida (idoso, doença grave...), senão null")}}
+INSTRUCAO_IA = ("Você lê petições iniciais brasileiras e extrai os dados para o cadastro no PJe. Responda só com o JSON "
+                "do esquema. Não invente: o que a petição não traz fica null. Copie nomes, CPF e CNPJ exatamente como "
+                "aparecem.")
+LIMITE_PDF_IA = 15 * 1024 * 1024  # maior que isso vai o texto extraído (o Gemini limita o tamanho do pedido)
+
+
+def token_do_google():
+    """Token da conta de serviço da máquina do Google (None fora dela: no modo local não há leitura por IA)."""
+    try:
+        pedido = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/"
+                                        "default/token", headers={"Metadata-Flavor": "Google"})
+        with urllib.request.urlopen(pedido, timeout=3) as r:
+            return json.load(r)["access_token"]
+    except Exception:
+        return None
+
+
+def ler_com_ia(caminho_pdf):
+    """Manda a petição (o próprio PDF: a extração de texto quebra palavras) ao Gemini e devolve o JSON do ESQUEMA_IA.
+    Erro de rede ou do Google sobe (o leitor anota e tenta de novo mais tarde)."""
+    token = token_do_google()
+    if not (token and PROJETO):
+        sys.exit("A leitura por IA só funciona no servidor do Autus (conta do Google da máquina).")
+    if os.path.getsize(caminho_pdf) <= LIMITE_PDF_IA:
+        with open(caminho_pdf, "rb") as f:
+            parte = {"inlineData": {"mimeType": "application/pdf", "data": base64.b64encode(f.read()).decode()}}
+    else:
+        parte = {"text": "PETIÇÃO INICIAL:\n\n" + texto_da_inicial(caminho_pdf)}
+    corpo = {"systemInstruction": {"parts": [{"text": INSTRUCAO_IA}]}, "contents": [{"role": "user", "parts": [parte]}],
+             "generationConfig": {"responseMimeType": "application/json", "responseSchema": ESQUEMA_IA, "temperature": 0}}
+    url = (f"https://aiplatform.googleapis.com/v1/projects/{PROJETO}/locations/global/publishers/google/models/"
+           f"{MODELO_IA}:generateContent")
+    pedido = urllib.request.Request(url, data=json.dumps(corpo).encode("utf-8"),
+                                    headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"})
+    with urllib.request.urlopen(pedido, timeout=300) as r:
+        resposta = json.load(r)
+    return json.loads(resposta["candidates"][0]["content"]["parts"][0]["text"])
+
+
+def _assinatura_pdf(caminho_pdf):
+    st = os.stat(caminho_pdf)
+    return {"pdf": os.path.basename(caminho_pdf), "tamanho": st.st_size, "modificado": st.st_mtime_ns}
+
+
+def gravar_leitura_ia(caminho_pdf, dados=None, erro="", segundos=None):
+    """Guarda a leitura (ou a falha) na pasta do cliente, presa a este PDF: trocou o PDF, lê de novo."""
+    registro = {**_assinatura_pdf(caminho_pdf), "modelo": MODELO_IA, "quando": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "dados": dados or {}, "erro": erro, "segundos": segundos}
+    caminho = os.path.join(os.path.dirname(caminho_pdf), ARQUIVO_LEITURA_IA)
+    with open(caminho + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(registro, f, ensure_ascii=False, indent=2)
+    os.replace(caminho + ".tmp", caminho)
+
+
+def leitura_ia(caminho_pdf):
+    """A leitura guardada, se for deste PDF (senão None)."""
+    try:
+        with open(os.path.join(os.path.dirname(caminho_pdf), ARQUIVO_LEITURA_IA), encoding="utf-8") as f:
+            registro = json.load(f)
+        assinatura = _assinatura_pdf(caminho_pdf)
+    except (OSError, ValueError):
+        return None
+    return registro if all(registro.get(k) == v for k, v in assinatura.items()) else None
+
+
+def estado_ia(pasta):
+    """'lida', 'erro' ou 'pendente' (None se a pasta não tem inicial)."""
+    try:
+        inicial = arquivos_da_pasta(pasta)[1]
+    except SystemExit:
+        return None
+    registro = leitura_ia(inicial)
+    return "pendente" if not registro else "erro" if registro.get("erro") else "lida"
+
+
+def dados_da_ia(caminho_pdf):
+    """A leitura da IA nos nomes de campo do robô, só com o que passou nas conferências."""
+    registro = leitura_ia(caminho_pdf)
+    if not registro or registro.get("erro"):
+        return {}
+    ia = registro.get("dados") or {}
+    texto = lambda chave: str(ia.get(chave) or "").strip()
+    dados = {}
+    if texto("autor_nome"):
+        dados["nome completo"] = texto("autor_nome")
+    doc = re.sub(r"\D", "", texto("autor_cpf"))
+    if cpf_valido(doc) or cnpj_valido(doc):
+        dados["cpf"] = formatar_documento(doc)
+    if texto("autor_endereco"):
+        dados["endereço"] = texto("autor_endereco")
+    if texto("reu_nome"):
+        dados["entidade"] = texto("reu_nome")
+    conhecido = CNPJ_CONHECIDO.get(texto("reu_nome").upper(), "")
+    doc = re.sub(r"\D", "", conhecido or texto("reu_cpf_cnpj"))  # o réu conhecido do escritório vale mais
+    if cpf_valido(doc) or cnpj_valido(doc):
+        dados["cnpj"] = formatar_documento(doc)
+    for chave, campo in (("autor_tipo_pessoa", "pessoa ativo"), ("reu_tipo_pessoa", "pessoa passivo")):
+        if texto(chave) in PESSOAS:
+            dados[campo] = texto(chave)
+    valor = formatar_valor(texto("valor_da_causa"))
+    if valor and not erro_no_valor("valor da causa", valor):
+        dados["valor da causa"] = valor
+    for chave, campo in (("justica_gratuita", "justiça gratuita"), ("liminar_ou_tutela", "pedido de liminar ou antecipação de tutela"),
+                         ("segredo_de_justica", "segredo de justiça")):
+        if isinstance(ia.get(chave), bool):
+            dados[campo] = "SIM" if ia[chave] else "NÃO"
+    return dados
 
 
 def dados_do_texto(texto, nome_arquivo):

@@ -393,6 +393,66 @@ def test_apagar_cliente():
     assert web.post("/api/clientes/Fulana/apagar").status_code == 403
 
 
+def test_texto_da_peticao():
+    """O texto da inicial, página por página, para o painel ao lado da ficha; só de pasta de cliente da lista."""
+    tmp = tempfile.mkdtemp()
+    pasta = os.path.join(tmp, "clientes", "Fulana")
+    os.makedirs(pasta)
+    open(os.path.join(pasta, "Fulana [Ação].pdf"), "wb").close()
+    open(os.path.join(pasta, "DOC 01] RG.pdf"), "wb").close()  # anexo não é a inicial
+    paginas = [mock.Mock(extract_text=lambda: "EXCELENTÍSSIMO SENHOR JUIZ"), mock.Mock(extract_text=lambda: None)]
+    web = app_web.app.test_client()
+    with mock.patch.object(robo, "SERVIDOR", True), mock.patch.object(robo, "DADOS", tmp):
+        with mock.patch.object(robo.PyPDF2, "PdfReader", lambda c: mock.Mock(pages=paginas) if c.endswith("[Ação].pdf") else 1 / 0):
+            r = web.get("/api/clientes/Fulana/texto")
+            assert r.status_code == 200 and r.get_json() == {"arquivo": "Fulana [Ação].pdf", "paginas": ["EXCELENTÍSSIMO SENHOR JUIZ", ""]}
+        assert web.get("/api/clientes/Fulana/texto").get_json()["paginas"] == []  # PDF que não abre
+        assert web.get("/api/clientes/..%2Fconfig.json/texto").status_code == 404  # nada de caminho vindo da página
+        assert web.get("/api/clientes/Ninguém/texto").status_code == 404
+        open(os.path.join(pasta, "Outra inicial.pdf"), "wb").close()  # pasta com problema: sem texto, com o motivo
+        r = web.get("/api/clientes/Fulana/texto").get_json()
+        assert r["paginas"] == [] and "1 PDF de inicial" in r["problema"]
+
+
+def test_leitor_ia_le_as_pastas_pendentes():
+    tmp = tempfile.mkdtemp()
+    pasta = os.path.join(tmp, "clientes", "Fulana")
+    os.makedirs(pasta)
+    with open(os.path.join(pasta, "Fulana [Ação].pdf"), "wb") as f:
+        f.write(b"%PDF-1.4 teste")
+    chamadas = []
+    web = app_web.app.test_client()
+    with mock.patch.object(robo, "SERVIDOR", True), mock.patch.object(robo, "DADOS", tmp), \
+         mock.patch.object(robo, "ler_com_ia", lambda c: chamadas.append(c) or {"autor_nome": "FULANA DE TAL"}):
+        lidas = app_web.estado["ia_lidas"]
+        app_web.ler_pendentes_ia()
+        assert len(chamadas) == 1 and robo.estado_ia(pasta) == "lida" and app_web.estado["ia_lidas"] == lidas + 1
+        app_web.ler_pendentes_ia()
+        assert len(chamadas) == 1  # já lida: não paga a leitura de novo
+        assert web.get("/api/clientes").get_json()["clientes"][0]["ia"] == "lida"
+        e = web.get("/api/estado").get_json()
+        assert e["ia_lidas"] == lidas + 1 and e["ia_ultima"] == "Fulana" and e["ia_lendo"] == "" and e["ia_segundos"] == 0
+        with mock.patch.object(robo, "identificar", lambda t, n: ({}, {})), mock.patch.object(robo, "texto_da_inicial", lambda c: ""):
+            ia = web.get("/api/clientes/Fulana").get_json()["ia"]  # a ficha mostra o que a IA leu e quanto tempo levou
+        assert ia["estado"] == "lida" and ia["campos"] == ["nome completo"] and isinstance(ia["segundos"], (int, float))
+    os.remove(os.path.join(pasta, robo.ARQUIVO_LEITURA_IA))
+
+    def falha(caminho):
+        raise OSError("cota esgotada")
+    with mock.patch.object(robo, "SERVIDOR", True), mock.patch.object(robo, "DADOS", tmp), \
+         mock.patch.object(robo, "ler_com_ia", falha):
+        app_web.ler_pendentes_ia()
+        assert robo.estado_ia(pasta) == "erro"  # o cadastro segue com as regras
+        parada = app_web.ler_historico()[-1]  # aparece em Erros, no painel do administrador
+        assert parada["tipo"] == "parada" and parada["cliente"] == "Fulana"
+        assert app_web.tipo_do_problema(parada["problema"]) == "Leitura pela IA"
+        app_web.ler_pendentes_ia()  # falhou agora há pouco: não tenta de novo na mesma hora
+        assert app_web.ler_historico()[-1] == parada
+    with mock.patch.object(robo, "SERVIDOR", False), mock.patch.object(robo, "DADOS", tmp), \
+         mock.patch.object(robo, "ler_com_ia", lambda c: 1 / 0):
+        app_web.ler_pendentes_ia()  # modo local: não lê
+
+
 if __name__ == "__main__":
     testes = [f for n, f in sorted(globals().items()) if n.startswith("test_")]
     for t in testes:

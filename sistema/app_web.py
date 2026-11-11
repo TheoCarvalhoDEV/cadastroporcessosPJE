@@ -44,7 +44,8 @@ app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # envio de pastas de clientes (servidor)
 app.config["MAX_FORM_PARTS"] = 20000  # cada arquivo enviado são 2 partes (arquivo e caminho); o padrão, 1000, é pouco
 # ponytail: estado em memória de um único usuário local; servidor central pediria sessão por escritório
-estado = {"tarefa": "", "atual": "", "log": [], "pausa": None, "resultados": {}, "autenticador": None, "teste_login": None}
+estado = {"tarefa": "", "atual": "", "log": [], "pausa": None, "resultados": {}, "autenticador": None, "teste_login": None,
+          "ia_lidas": 0, "ia_lendo": "", "ia_desde": 0, "ia_ultima": ""}  # leitura das petições pela IA (só no servidor): a página recarrega a lista
 respostas = queue.Queue()
 trava = threading.Lock()
 escritorio = robo.carregar_escritorio()
@@ -141,6 +142,64 @@ def trabalhador():
 
 
 threading.Thread(target=trabalhador, daemon=True).start()
+
+
+# ---------- leitura das petições pela IA (só no servidor), em segundo plano ----------
+# ~30 s por petição: lê assim que a pasta chega, sem travar a lista; a ficha usa a leitura quando ela existe e, até
+# lá (ou se a IA falhar), as regras de texto. Falha vai para Erros, no painel do administrador.
+acordar_ia = threading.Event()
+TENTAR_DE_NOVO_IA = 30 * 60  # segundos depois de uma falha (cota, rede, PDF ilegível)
+
+
+def ler_pendentes_ia():
+    """Lê com a IA as petições das pastas que ainda não têm leitura válida (uma de cada vez)."""
+    if not robo.SERVIDOR:
+        return
+    for pasta in robo.pastas_de_clientes(raiz()):
+        nome = os.path.basename(pasta)
+        if estado["tarefa"] == "cadastrar" and nome == estado["atual"]:
+            continue  # o robô está usando a pasta
+        try:
+            inicial = robo.arquivos_da_pasta(pasta)[1]
+        except SystemExit:
+            continue
+        registro = robo.leitura_ia(inicial)
+        if registro and not (registro.get("erro") and time.time() - os.path.getmtime(
+                os.path.join(pasta, robo.ARQUIVO_LEITURA_IA)) > TENTAR_DE_NOVO_IA):
+            continue
+        estado["ia_lendo"], estado["ia_desde"] = nome, time.time()
+        try:
+            dados = robo.ler_com_ia(inicial)
+        except BaseException as e:  # inclui o SystemExit de "sem conta do Google"
+            msg = str(e) if isinstance(e, SystemExit) else robo.resumo(e)
+            try:
+                robo.gravar_leitura_ia(inicial, erro=msg)
+            except OSError:
+                pass
+            robo.anotar("parada", tarefa="leitura pela IA", cliente=nome, problema=f"Leitura pela IA: {msg}", foto="")
+            continue
+        finally:
+            estado["ia_lendo"] = ""
+        try:
+            robo.gravar_leitura_ia(inicial, dados, segundos=round(time.time() - estado["ia_desde"], 1))
+        except OSError:  # a pasta mudou no meio (cadastrada, apagada)
+            continue
+        estado["ia_lidas"] += 1
+        estado["ia_ultima"] = nome  # a página dá o brilho nos campos que acabaram de chegar
+
+
+def leitor_ia():
+    while True:
+        try:
+            ler_pendentes_ia()
+        except Exception as e:
+            robo.log(f"Leitura pela IA: {robo.resumo(e)}")
+        acordar_ia.wait(300)  # pasta nova chegando acorda antes (enviar_pastas)
+        acordar_ia.clear()
+
+
+if robo.SERVIDOR:
+    threading.Thread(target=leitor_ia, daemon=True).start()
 
 
 def em_tarefa(tipo, alvo, *args):
@@ -290,7 +349,8 @@ def ver_estado():
     return jsonify(tarefa=estado["tarefa"], atual=estado["atual"], pausa=estado["pausa"],
                    resultados=estado["resultados"], log=estado["log"][desde:], total=len(estado["log"]),
                    etapas=[n for n, _ in robo.ETAPAS], autenticador=estado["autenticador"],
-                   teste_login=estado["teste_login"])
+                   teste_login=estado["teste_login"], ia_lidas=estado["ia_lidas"], ia_lendo=estado["ia_lendo"],
+                   ia_segundos=int(time.time() - estado["ia_desde"]) if estado["ia_lendo"] else 0, ia_ultima=estado["ia_ultima"])
 
 
 @app.get("/api/escritorio")
@@ -387,7 +447,8 @@ def clientes():
     # ponytail: confere todas a cada pedido (lê os PDFs); com centenas de pastas, guardar por data de modificação
     lista = []
     for pasta in robo.pastas_de_clientes(raiz()):
-        item = {"nome": os.path.basename(pasta), "situacao": "pronto", "problema": "", "anexos": None}
+        item = {"nome": os.path.basename(pasta), "situacao": "pronto", "problema": "", "anexos": None,
+                "ia": robo.estado_ia(pasta) if robo.SERVIDOR else None}
         try:  # para a lista: "Ação de Cobrança · 3 anexos"
             item["anexos"] = len(robo.arquivos_da_pasta(pasta)[2])
         except SystemExit:
@@ -433,7 +494,33 @@ def cliente(nome):
     except SystemExit as e:
         dados, problema = None, str(e)
     return jsonify(problema=problema, campos=campos, dados=dados, motivos=motivos, rascunho=robo.rascunho_salvo(pasta),
-                   docx=os.path.basename(robo.arquivos_da_pasta(pasta)[0] or ""))
+                   docx=os.path.basename(robo.arquivos_da_pasta(pasta)[0] or ""), ia=leitura_para_a_ficha(pasta))
+
+
+@app.get("/api/clientes/<path:nome>/texto")
+def texto_da_peticao(nome):
+    """A petição inicial, página por página, para a tela mostrar ao lado da ficha (o PDF não abre embutido: a
+    política de segurança da página não deixa). Mesma inicial e mesmo controle de nome da ficha."""
+    pasta = pasta_do_cliente(nome)
+    try:
+        inicial = robo.arquivos_da_pasta(pasta)[1]
+    except SystemExit as e:
+        return jsonify(arquivo="", paginas=[], problema=str(e))
+    try:
+        paginas = [p.extract_text() or "" for p in robo.PyPDF2.PdfReader(inicial).pages]
+    except Exception:  # PDF que não abre: a tela diz que não deu para mostrar o texto
+        paginas = []
+    return jsonify(arquivo=os.path.basename(inicial), paginas=paginas)
+
+
+def leitura_para_a_ficha(pasta):
+    """Servidor: o que a IA fez nesta petição (estado, campos que preencheu, tempo ou motivo da falha)."""
+    if not robo.SERVIDOR:
+        return None
+    inicial = robo.arquivos_da_pasta(pasta)[1]
+    registro = robo.leitura_ia(inicial) or {}
+    return {"estado": robo.estado_ia(pasta), "campos": list(robo.dados_da_ia(inicial)),
+            "segundos": registro.get("segundos"), "erro": registro.get("erro", "")}
 
 
 @app.post("/api/clientes/<path:nome>/corrigir")
@@ -540,6 +627,7 @@ def enviar_pastas():
     ignorados += caminhos[len(arquivos):]
     if not nomes:
         abort(400, "Nenhum arquivo .pdf ou .docx dentro de pastas de clientes.")
+    acordar_ia.set()  # a IA começa a ler as pastas novas
     return jsonify(clientes=list(nomes.values()), ignorados=ignorados)
 
 
@@ -667,6 +755,7 @@ def responder():
 # ---------- relatório ----------
 
 TIPOS_DE_PROBLEMA = [  # (nome no relatório, trecho da mensagem) - vale o 1º que aparecer; nenhum = "Outros"
+    ("Leitura pela IA", r"^leitura pela ia"),
     ("Chrome do robô não abriu", r"não consegui abrir o chrome"),
     ("Código do autenticador", r"autenticador|base32|código .*recus"),
     ("Login do PJe", r"login"),
