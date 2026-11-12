@@ -13,7 +13,8 @@ from werkzeug.serving import make_server
 
 RAIZ = tempfile.mkdtemp()
 os.environ.update(ROBO_RAIZ=RAIZ, ROBO_CHAVE_SESSAO="teste", FIREBASE_API_KEY="x")
-os.environ.pop("ROBO_SITE", None)  # sem site: a página sai do próprio porteiro (o teste do site liga à parte)
+os.environ.pop("ROBO_SITE", None)  # sem ROBO_SITE: o site padrão, https://autus.web.app
+PAGINA = {"Origin": "https://autus.web.app"}
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "servidor"))
 import porteiro
 
@@ -80,7 +81,7 @@ def test_porteiro():
     j = web.get("/api/clientes/Fulana%20de%20Tal%20%5BA%C3%A7%C3%A3o%5D%2050%25?x=%C3%A9", headers=ana).get_json()
     assert j == {"nome": "Fulana de Tal [Ação] 50%", "query": "x=%C3%A9"}, j
     assert web.post("/api/eco", json={}, headers={**ana, "Origin": "https://mal.exemplo"}).status_code == 403
-    assert web.post("/api/eco", json={}, headers={**ana, "Origin": "http://localhost"}).status_code == 200
+    assert web.post("/api/eco", json={}, headers={**ana, **PAGINA}).status_code == 200
     # chave alterada (outro e-mail colado no meio) ou vencida não vale
     falsa = ana["Authorization"][:-3] + ("AAA" if not ana["Authorization"].endswith("AAA") else "BBB")
     assert web.get("/api/eco", headers={"Authorization": falsa}).status_code == 401
@@ -123,25 +124,22 @@ def test_pagina_no_firebase_hosting():
     pelo endereço do servidor vai para lá (com o caminho e o código do e-mail de criar senha)."""
     gravar_escritorios(teste={"nome": "Teste", "porta": servidor.server_port, "emails": ["ana@x.com"]})
     web = porteiro.app.test_client()
-    with mock.patch.multiple(porteiro, PAGINA="https://autus.web.app",
-                             ORIGENS={"https://autus.web.app", "https://autus.firebaseapp.com"}):
-        r = web.get("/nova-senha?mode=resetPassword&oobCode=abc")
-        assert r.status_code == 302 and r.headers["Location"] == "https://autus.web.app/nova-senha?mode=resetPassword&oobCode=abc"
-        assert web.get("/").headers["Location"] == "https://autus.web.app/"
-        pagina = {"Origin": "https://autus.web.app"}
-        r = web.options("/api/estado", headers={**pagina, "Access-Control-Request-Method": "GET",
-                                                 "Access-Control-Request-Headers": "authorization"})
-        assert r.status_code == 204 and r.headers["Access-Control-Allow-Origin"] == "https://autus.web.app"
-        assert "Authorization" in r.headers["Access-Control-Allow-Headers"]
-        assert web.options("/api/estado", headers={"Origin": "https://mal.exemplo"}).status_code == 403
-        r = web.post("/entrar", json={"email": "ana@x.com", "senha": "certa"}, headers=pagina)
-        assert r.status_code != 403 and r.headers["Access-Control-Allow-Origin"] == "https://autus.web.app"
-        ana = {**pagina, **chave(web, "ana@x.com")}
-        r = web.post("/api/eco", json={}, headers=ana)
-        assert r.status_code == 200 and r.headers["Access-Control-Allow-Origin"] == "https://autus.web.app"
-        r = web.get("/api/eco", headers={"Origin": "https://mal.exemplo", "Authorization": ana["Authorization"]})
-        assert "Access-Control-Allow-Origin" not in r.headers  # outro site não lê a resposta
-        assert web.post("/entrar", json={}, headers={"Origin": "https://mal.exemplo"}).status_code == 403
+    r = web.get("/nova-senha?mode=resetPassword&oobCode=abc")
+    assert r.status_code == 302 and r.headers["Location"] == "https://autus.web.app/nova-senha?mode=resetPassword&oobCode=abc"
+    assert web.get("/").headers["Location"] == "https://autus.web.app/"
+    r = web.options("/api/estado", headers={**PAGINA, "Access-Control-Request-Method": "GET",
+                                             "Access-Control-Request-Headers": "authorization"})
+    assert r.status_code == 204 and r.headers["Access-Control-Allow-Origin"] == "https://autus.web.app"
+    assert "Authorization" in r.headers["Access-Control-Allow-Headers"]
+    assert web.options("/api/estado", headers={"Origin": "https://mal.exemplo"}).status_code == 403
+    r = web.post("/entrar", json={"email": "ana@x.com", "senha": "certa"}, headers=PAGINA)
+    assert r.status_code != 403 and r.headers["Access-Control-Allow-Origin"] == "https://autus.web.app"
+    ana = {**PAGINA, **chave(web, "ana@x.com")}
+    r = web.post("/api/eco", json={}, headers=ana)
+    assert r.status_code == 200 and r.headers["Access-Control-Allow-Origin"] == "https://autus.web.app"
+    r = web.get("/api/eco", headers={"Origin": "https://mal.exemplo", "Authorization": ana["Authorization"]})
+    assert "Access-Control-Allow-Origin" not in r.headers  # outro site não lê a resposta
+    assert web.post("/entrar", json={}, headers={"Origin": "https://mal.exemplo"}).status_code == 403
 
 
 def test_administrador():
@@ -260,7 +258,7 @@ def test_login_com_o_google_e_pedidos_de_acesso():
         with mock.patch.object(porteiro, "MAX_PEDIDOS", 0):
             contas["t-spam"] = {"email": "spam@gmail.com", "nome": ""}
             entrar_g("t-spam")
-        assert porteiro.ler_pedidos() == {}  # a lista não cresce sem fim
+        assert porteiro.ler_json(porteiro.ARQUIVO_PEDIDOS) == {}  # a lista não cresce sem fim
     acoes = [l["acao"] for l in web.get("/admin/registro", headers=chave(web, "chefe@x.com")).get_json()["registro"]]
     assert "liberou pedido de acesso (Google)" in acoes and "recusou pedido de acesso (Google)" in acoes and "entrou (Google)" in acoes
 
@@ -295,10 +293,11 @@ def test_conferir_google_exige_email_confirmado():
 
 
 def test_criar_senha_pelo_link_do_email():
-    """O link do e-mail do Firebase aponta para /nova-senha do próprio robô (a página do Firebase vinha sem a chave)."""
+    """O link do e-mail do Firebase aponta para /nova-senha (a página do Firebase vinha sem a chave): o porteiro manda
+    para a página no Firebase Hosting e cria a senha com o código."""
     web = porteiro.app.test_client()
     pagina = web.get("/nova-senha?mode=resetPassword&oobCode=abc&apiKey=&lang=pt-BR")
-    assert pagina.status_code == 200 and b"<html" in pagina.data.lower()
+    assert pagina.status_code == 302 and "oobCode=abc" in pagina.headers["Location"]
     chamadas = []
 
     def firebase(acao, corpo, resposta=(200, {})):
@@ -338,11 +337,12 @@ def test_email_de_criar_senha_vai_com_a_conta_da_maquina():
     assert pedidos[0].get_header("Authorization") == "Bearer TOKEN" and "sendOobCode" in pedidos[0].full_url
     assert pedidos[1].get_header("Authorization") is None  # o login da pessoa não usa a conta da máquina
     assert pedidos[2].get_header("Authorization") == "Bearer TOKEN" and "signUp" in pedidos[2].full_url
-    assert "continueUrl" not in json.loads(pedidos[0].data)  # sem site do Firebase Hosting, sem botão Continuar
-    with mock.patch.object(porteiro, "token_da_maquina", lambda: "TOKEN"), \
-         mock.patch.object(porteiro.urllib.request, "urlopen", abrir), mock.patch.object(porteiro, "PAGINA", "https://autus.web.app"):
+    assert json.loads(pedidos[0].data)["continueUrl"] == "https://autus.web.app/"  # Continuar leva ao Autus
+    def sem_maquina():
+        raise OSError("fora do Google")
+    with mock.patch.object(porteiro, "token_da_maquina", sem_maquina), mock.patch.object(porteiro.urllib.request, "urlopen", abrir):
         porteiro.pedir_nova_senha("a@x.com")
-    assert json.loads(pedidos[3].data)["continueUrl"] == "https://autus.web.app/"  # Continuar leva ao Autus
+    assert pedidos[3].get_header("Authorization") is None  # fora da máquina do Google: vai sem a conta dela
     senha = json.loads(pedidos[2].data)["password"]
     assert len(senha) >= 10 and any(c.isdigit() for c in senha)  # a senha provisória cumpre a regra de senha
 

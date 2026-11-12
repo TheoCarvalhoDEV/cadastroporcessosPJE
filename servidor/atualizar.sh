@@ -35,8 +35,6 @@ for env in $RAIZ/escritorios/*/robo.env; do
 done
 # a página no Firebase Hosting (ROBO_SITE e ROBO_API no porteiro.env) sai ANTES do porteiro reiniciar: o porteiro
 # novo manda quem chega pelo endereço do servidor para a página do Firebase
-if grep -q '^ROBO_SITE=.' $RAIZ/porteiro.env; then
-  sudo -u robo bash -c "set -a; . $RAIZ/porteiro.env; exec $RAIZ/venv/bin/python $RAIZ/codigo/servidor/publicar_pagina.py"
-fi
+sudo -u robo bash -c "set -a; . $RAIZ/porteiro.env; exec $RAIZ/venv/bin/python $RAIZ/codigo/servidor/publicar_pagina.py"
 systemctl restart porteiro
 echo "Atualizado."

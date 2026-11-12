@@ -64,7 +64,7 @@ def test_opcao_parecida():
 def test_endereco_da_inicial():
     texto = ("residente e domiciliado na Rua Santa Maria [Quadra nº 15] , nº 6 05, Bairro Marajoara , Cáceres /Mato "
              "Grosso, Código Endereçame nto Postal [CEP]: 782 05-515, por seu patrono")
-    endereco = robo.dados_do_texto(texto, "x.pdf")["endereço"]
+    endereco = robo.identificar(texto, "x.pdf")[0]["endereço"]
     assert endereco == "Rua Santa Maria [Quadra nº 15], nº 6 05, Bairro Marajoara, Cáceres/Mato Grosso, CEP 78205-515"
     assert robo.partes_do_endereco(endereco) == {"cep": "78205-515", "logradouro": "Rua Santa Maria",
         "bairro": "Marajoara", "numero": "605", "complemento": "Quadra nº 15", "cidade": "Cáceres"}
@@ -149,13 +149,13 @@ TEXTO_INICIAL = ("EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DE DIREITO DA VARA ESPECIAL
 
 
 def test_regras_tiram_da_inicial_o_que_o_docx_dava():
-    d = robo.dados_do_texto(TEXTO_INICIAL, "Fulana de Tal Souza [Ação Execução].pdf")
+    d = robo.identificar(TEXTO_INICIAL, "Fulana de Tal Souza [Ação Execução].pdf")[0]
     assert d["jurisdição"] == "CUIABÁ CÍVEL"
     assert d["classe judicial"].endswith("(12078)") and d["assunto principal"].startswith("9517")
     assert d["matéria"] == "DIREITO PROCESSUAL CIVIL E DO TRABALHO"
     assert (d["cpf"], d["entidade"], d["valor da causa"]) == ("529.982.247-25", "ESTADO DE MATO GROSSO", "8.333,31")
     assert (d["tipo ativo"], d["tipo passivo"]) == ("EXEQUENTE", "EXECUTADO")
-    outra = robo.dados_do_texto("COMARCA DE SINOP ESTADO DE MATO GROSSO ação de cobrança", "X [Ação].pdf")
+    outra = robo.identificar("COMARCA DE SINOP ESTADO DE MATO GROSSO ação de cobrança", "X [Ação].pdf")[0]
     assert outra["jurisdição"] is None and outra["classe judicial"] is None  # não chuta: fica para escolher
 
 
@@ -165,7 +165,7 @@ def test_regra_fgts_juizado():
              "propor a presente AÇÃO DE COBRANÇA – FUNDO DE GARANTI A DO TEMPO DE SERVIÇO [FGTS] em desfavor de "
              "ESTADO DE MATO GROSSO , pessoa jurídica ... Juizado Especial da Fazenda Pública ... REQUERENTE ... "
              "Do Valor da Causa Dá-se à presente o valor de R$ 1.621,00")
-    d = robo.dados_do_texto(texto, "Cicrano Silva Pereira [Ação Cobrança Indenizatória Substitutiva [FGTS].pdf")
+    d = robo.identificar(texto, "Cicrano Silva Pereira [Ação Cobrança Indenizatória Substitutiva [FGTS].pdf")[0]
     assert d["nome completo"] == "CICRANO DA SILVA PEREIRA"  # da qualificação, não do nome do arquivo (sem o "DA")
     assert robo.comparavel("nome completo", "BELTR ANO RODRIGUES DOS SANTOS") == robo.comparavel("nome completo", "Beltrano Rodrigues dos Santos")
     assert d["jurisdição"] == "NÚCLEO DE JUSTIÇA DIGITAL DOS JUIZADOS ESPECIAIS"
@@ -174,9 +174,9 @@ def test_regra_fgts_juizado():
     assert (d["tipo ativo"], d["tipo passivo"]) == ("REQUERENTE", "REQUERIDO")
     # Juizado da Fazenda de comarca: vai para os JUIZADOS da comarca (não para a vara cível), mesmo com o PDF
     # quebrando a palavra ("C UIABÁ"); comarca fora da tabela fica pendente
-    juizado = lambda comarca: robo.dados_do_texto(texto.replace(
+    juizado = lambda comarca: robo.identificar(texto.replace(
         "NÚCLEO DE JUSTIÇA DIGITAL DOS JUIZADOS ESPECIAIS DO", f"JUIZADO ESPECIAL DA FAZENDA PÚBLICA DA COMARCA DE {comarca}"),
-        "X [Ação].pdf")["jurisdição"]
+        "X [Ação].pdf")[0]["jurisdição"]
     assert juizado("C UIABÁ") == "CUIABÁ JUIZADOS"
     assert juizado("CÁCERES") == "CÁCERES JUIZADOS"
     assert juizado("VÁRZEA GRANDE") == "VÁRZEA GRANDE JUIZADOS"
@@ -223,7 +223,7 @@ def test_pasta_sem_docx_funciona_so_com_a_inicial():
     os.makedirs(pasta)
     open(os.path.join(pasta, "Fulana de Tal Souza [Ação Execução].pdf"), "wb").close()
     open(os.path.join(pasta, "DOC 01] Documentos.pdf"), "wb").close()
-    with mock.patch.object(robo, "dados_da_inicial", lambda c: robo.dados_do_texto(TEXTO_INICIAL, os.path.basename(c))):
+    with mock.patch.object(robo, "dados_da_inicial", lambda c: robo.identificar(TEXTO_INICIAL, os.path.basename(c))[0]):
         cliente = robo.preparar(pasta)
     assert cliente["dados"]["classe judicial"].endswith("(12078)")
     assert cliente["origem"]["classe judicial"] == "regra" and cliente["origem"]["cpf"] == "inicial"

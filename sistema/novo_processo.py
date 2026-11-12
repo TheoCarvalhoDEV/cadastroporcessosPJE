@@ -28,11 +28,11 @@ PASTA = os.path.dirname(SISTEMA)                       # a pasta do robô; as pa
 SERVIDOR = os.environ.get("ROBO_SERVIDOR") == "1"
 DADOS = os.environ.get("ROBO_DADOS") or os.path.join(PASTA, "dados_do_escritorio")  # login, configuração, Chrome, fotos
 ARQUIVO_CONFIG = os.path.join(DADOS, "config.json")    # login do PJe no modo local
+PROJETO = os.environ.get("ROBO_PROJETO", "")  # o projeto do Google Cloud (só no servidor)
 # login do PJe no servidor: um segredo por escritório no Secret Manager (nunca no disco nem nos snapshots)
-SEGREDO = f"projects/{os.environ.get('ROBO_PROJETO', '')}/secrets/pje-login-{os.environ.get('ROBO_ESCRITORIO', '')}"
+SEGREDO = f"projects/{PROJETO}/secrets/pje-login-{os.environ.get('ROBO_ESCRITORIO', '')}"
 # leitura da petição pela IA (Gemini no Vertex AI, endereço global: o Gemini não responde em São Paulo); só no servidor
-PROJETO = os.environ.get("ROBO_PROJETO", "")
-MODELO_IA = os.environ.get("ROBO_IA_MODELO", "gemini-3.8-flash")
+MODELO_IA = "gemini-3.8-flash"
 ARQUIVO_LEITURA_IA = "leitura_ia.json"  # na pasta do cliente: a leitura da IA, valendo enquanto o PDF não mudar
 URL_LOGIN = "https://pje.tjmt.jus.br/pje/login.seam"
 # Mesmo link do menu "Processo > Novo processo"
@@ -136,8 +136,11 @@ class Pulado(SystemExit):
     """Responderam 'Pular este cliente' numa pausa (para o relatório separar de erro)."""
 
 
-class PJeInstavel(Exception):
-    """O PJe não respondeu como esperado ('Erro inesperado', campo que não aceitou o valor): dá para refazer a etapa."""
+def gravar_json(caminho, dados, indent=2):
+    """Grava inteiro ou nada: escreve ao lado e troca (quem lê nunca pega o arquivo pela metade)."""
+    with open(caminho + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False, indent=indent)
+    os.replace(caminho + ".tmp", caminho)
 
 
 def arquivos_da_pasta(pasta):
@@ -287,10 +290,7 @@ def gravar_leitura_ia(caminho_pdf, dados=None, erro="", segundos=None):
     """Guarda a leitura (ou a falha) na pasta do cliente, presa a este PDF: trocou o PDF, lê de novo."""
     registro = {**_assinatura_pdf(caminho_pdf), "modelo": MODELO_IA, "quando": time.strftime("%Y-%m-%dT%H:%M:%S"),
                 "dados": dados or {}, "erro": erro, "segundos": segundos}
-    caminho = os.path.join(os.path.dirname(caminho_pdf), ARQUIVO_LEITURA_IA)
-    with open(caminho + ".tmp", "w", encoding="utf-8") as f:
-        json.dump(registro, f, ensure_ascii=False, indent=2)
-    os.replace(caminho + ".tmp", caminho)
+    gravar_json(os.path.join(os.path.dirname(caminho_pdf), ARQUIVO_LEITURA_IA), registro)
 
 
 def leitura_ia(caminho_pdf):
@@ -348,25 +348,16 @@ def dados_da_ia(caminho_pdf):
     return dados
 
 
-def dados_do_texto(texto, nome_arquivo):
-    return identificar(texto, nome_arquivo)[0]
-
-
-_mapa = None
-
-
+@functools.cache
 def mapa_pje():
     """Opções da tela Novo processo lidas do PJe por mapear_pje.py: {matéria: {"jurisdicoes": {jurisdição:
     [competências]}, "classes": {competência: [classes]}}}. Vazio se não foram lidas (aí jurisdição, competência
-    e classe ficam para escolher na interface). Quem relê o mapa zera _mapa."""
-    global _mapa
-    if _mapa is None:
-        try:
-            with open(ARQUIVO_MAPA, encoding="utf-8") as f:
-                _mapa = json.load(f).get("materias", {})
-        except (OSError, ValueError):
-            _mapa = {}
-    return _mapa
+    e classe ficam para escolher na interface). Quem relê o mapa chama mapa_pje.cache_clear()."""
+    try:
+        with open(ARQUIVO_MAPA, encoding="utf-8") as f:
+            return json.load(f).get("materias", {})
+    except (OSError, ValueError):
+        return {}
 
 
 # palavras que não ajudam a escolher: artigos e o vocabulário de qualquer endereçamento
@@ -835,12 +826,11 @@ def gravar_config(config):
             if v.name != nova.name:
                 cliente.destroy_secret_version(request={"name": v.name})
         return
-    with open(ARQUIVO_CONFIG + ".tmp", "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
-    os.replace(ARQUIVO_CONFIG + ".tmp", ARQUIVO_CONFIG)
+    gravar_json(ARQUIVO_CONFIG, config)
 
 
 ERRO_LOGIN = "#input-error, #input-error-otp-code, .kc-feedback-text, .alert-error, #mensagemErroLogin, .rich-messages"
+ERRO_NA_TELA = ".rich-messages, .alert-danger"  # os avisos do PJe nas telas do cadastro
 NOVO_AUTENTICADOR = "#kc-totp-settings-form"  # página do QR: o PJe quer um autenticador novo (pediram 'Configurar novo dispositivo')
 CONFIGURE_NO_ROBO = "Em Configurações > Login do PJe, clique em 'Configurar o código pelo robô'."
 
@@ -935,8 +925,9 @@ def conta_do_pje_no_qr(imagem):
                      "Exporte só a conta do PJe no Google Authenticator e envie de novo.")
 
 
-def mensagens_da_tela(d):
-    return " ".join(e.inner_text().strip() for e in d.query_selector_all(ERRO_LOGIN) if e.inner_text().strip())
+def mensagens_da_tela(d, seletor=ERRO_LOGIN):
+    """As mensagens de erro que o PJe mostra (no login, por padrão), juntas numa linha."""
+    return " | ".join(e.inner_text().strip() for e in d.query_selector_all(seletor) if e.inner_text().strip())
 
 
 def cpf_e_senha(d, config):
@@ -1102,10 +1093,7 @@ def navegador(logar=True):
                 return navegador_atual
         except Exception:
             pass
-        try:
-            navegador_atual.context.close()
-        except Exception:
-            pass
+        fechar_navegador()
     log("Abrindo o Chrome do robô...")
     # guarda a página ANTES do login: se o login parar (senha errada, código recusado...), o Chrome continua aberto
     # com o perfil travado, e a próxima tentativa tem de reaproveitá-lo em vez de abrir outro (que falharia)
@@ -1163,7 +1151,7 @@ def valor(e):
     return e.evaluate("e => e.value")  # o valor de agora (o atributo value guarda só o inicial)
 
 
-def destacar(d, e):
+def destacar(e):
     """Rola até o elemento e contorna de vermelho: mostra na tela o que o robô vai mexer."""
     e.evaluate("e => { e.scrollIntoView({block: 'center'}); e.style.outline = '3px solid red'; }")
 
@@ -1185,7 +1173,7 @@ def aguardar(d):
     d.wait_for_timeout(500)
     esperar_ate(lambda: d.evaluate(SEM_AJAX), 60)
     if "errorUnexpected" in d.url:
-        raise PJeInstavel("O PJe respondeu 'Erro inesperado'.")
+        raise RuntimeError("O PJe respondeu 'Erro inesperado'.")  # dá para refazer a etapa
     if parar:
         sys.exit("Parado pelo usuário.")
     if PAUSA_SEGUNDOS:
@@ -1201,7 +1189,7 @@ def clicar(d, seletor):
     log(f"    clicar: {descrever(d, e, seletor)}")
     for tentativa in range(3):
         try:
-            destacar(d, e)
+            destacar(e)
             d.wait_for_timeout(PAUSA_SEGUNDOS * 500)
             e.click(timeout=10000)
             break
@@ -1236,6 +1224,11 @@ def opcoes_da_lista(campo):
     return [tuple(o) for o in campo.evaluate("s => Array.from(s.options).map(o => [o.value, o.textContent.trim()])")]
 
 
+def opcoes_validas(d, seletor):
+    """Os textos das opções da lista, sem o 'Selecione' (para mostrar na pausa o que o PJe tem)."""
+    return [t for _, t in opcoes_da_lista(lista(d, seletor)) if t and "selecione" not in t.lower()]
+
+
 def escolher(d, seletor, texto):
     """Seleciona a opção de texto igual a `texto` (ou que termine com ele, ex.: '(12078)'). Se não houver igual,
     aceita a escrita parecida (sem acento, 'e/de/do'...). Sem nenhuma, pausa mostrando as opções que o PJe tem."""
@@ -1245,12 +1238,11 @@ def escolher(d, seletor, texto):
                  or [o for o in opcoes if parecido(o[1]) == parecido(texto)])
         return achou[0] if achou else None
     log(f"    escolher: {texto}")
-    destacar(d, lista(d, seletor))
+    destacar(lista(d, seletor))
     try:
         escolhida, rotulo = esperar_ate(opcao, 30)
     except TempoEsgotado:
-        opcoes = [t for _, t in opcoes_da_lista(lista(d, seletor)) if t and "selecione" not in t.lower()]
-        raise Problema(f"Opção '{texto}' não existe no PJe. Opções da lista: {' | '.join(opcoes[:15])}. "
+        raise Problema(f"Opção '{texto}' não existe no PJe. Opções da lista: {' | '.join(opcoes_validas(d, seletor)[:15])}. "
                        "Escolha a certa na ficha do cliente e clique em Tentar de novo, ou escolha à mão no Chrome e clique em Continuar.")
     if rotulo != texto:
         log(f"    (no PJe está escrito '{rotulo}')")
@@ -1272,21 +1264,21 @@ def digitar(d, seletor, digitos):
         d.wait_for_timeout(500)
         aguardar(d)
         campo = visivel(d, seletor)  # o AJAX do foco pode redesenhar o campo
-        destacar(d, campo)
+        destacar(campo)
         campo.focus()
         for tecla in ("Control+A", "Delete", "Home"):
             d.keyboard.press(tecla)
         d.keyboard.type(digitos, delay=50)
         if re.sub(r"\D", "", valor(campo)) == digitos:
             return campo
-    raise PJeInstavel(f"O campo {seletor} ficou '{valor(campo)}', esperado {digitos}.")
+    raise RuntimeError(f"O campo {seletor} ficou '{valor(campo)}', esperado {digitos}.")  # dá para refazer a etapa
 
 
 # ---------- abas do cadastro ----------
 
-def escolher_dados_iniciais(d, dados):
+def dados_iniciais(d, dados):
     """Tela Novo processo (vista em 04/11/2026): Matéria -> Jurisdição -> Competência -> Classe, nessa ordem, porque
-    cada lista só se enche depois da escolha anterior. Não clica em Incluir (não cria rascunho)."""
+    cada lista só se enche depois da escolha anterior. Depois clica em Incluir, que cria o rascunho."""
     d.goto(URL_NOVO_PROCESSO)
     esperar_ate(lambda: d.query_selector("[id='form_lbl']"))  # aba "Dados iniciais"
     escolher(d, "select[id$=':areaDireitoCombo']", dados["matéria"])
@@ -1294,10 +1286,6 @@ def escolher_dados_iniciais(d, dados):
     competencia(d, dados)
     codigo = re.search(r"\((\d+)\)", dados["classe judicial"])[1]
     escolher(d, "select[id$=':classeJudicialCombo']", f"({codigo})")
-
-
-def dados_iniciais(d, dados):
-    escolher_dados_iniciais(d, dados)
     clicar(d, "input[id$=':incluiProcessoButton']")  # cria o rascunho
     esperar_ate(lambda: d.query_selector("[id='assunto_lbl']"), 40)
 
@@ -1315,8 +1303,7 @@ def competencia(d, dados):
         esperar_ate(lambda: len(opcoes_da_lista(lista(d, seletor))) > 1)
     except TempoEsgotado:
         pass
-    opcoes = [t for _, t in opcoes_da_lista(lista(d, seletor)) if t and "selecione" not in t.lower()]
-    raise Problema(f"O robô não sabe a COMPETÊNCIA deste processo. Opções do PJe: {' | '.join(opcoes[:20])}. Escolha na "
+    raise Problema(f"O robô não sabe a COMPETÊNCIA deste processo. Opções do PJe: {' | '.join(opcoes_validas(d, seletor)[:20])}. Escolha na "
                    "ficha do cliente e clique em Tentar de novo, ou escolha no Chrome a competência e a classe, clique em "
                    "Incluir e depois em Continuar.")
 
@@ -1363,8 +1350,7 @@ def vincular(d, botao, grid, nome):
     try:
         esperar_ate(lambda: any(nome.upper() in t.upper() for t in linhas_da_grade(d, grid)))
     except TempoEsgotado:
-        msgs = " | ".join(e.inner_text() for e in d.query_selector_all(".rich-messages, .alert-danger") if e.inner_text().strip())
-        raise Problema(f"Não consegui vincular {nome}: {msgs or 'o PJe não mostrou mensagem'}")
+        raise Problema(f"Não consegui vincular {nome}: {mensagens_da_tela(d, ERRO_NA_TELA) or 'o PJe não mostrou mensagem'}")
 
 
 def escolher_pessoa(d, pessoa):
@@ -1465,7 +1451,7 @@ def cadastrar_endereco(d, nome, endereco):
                        "endereço da parte no Chrome (ou preencha na ficha do cliente) e clique em Tentar de novo.")
     log(f"  {nome} sem endereço no PJe: cadastrando o da inicial ({endereco}).")
     cep = visivel(d, "input[id$=':cadastroPartePessoaEnderecoCEP']")
-    destacar(d, cep)
+    destacar(cep)
     cep.fill("")
     cep.focus()
     d.keyboard.type(partes["cep"], delay=100)  # a sugestão só abre com os 9 caracteres (00000-000), tecla a tecla
@@ -1487,7 +1473,7 @@ def cadastrar_endereco(d, nome, endereco):
         e = visivel(d, seletor)
         # CEP de rua: o PJe preenche e TRAVA bairro e logradouro (cinza). Campo travado ou já preenchido fica como está.
         if texto and e.is_enabled() and not valor(e).strip():
-            destacar(d, e)
+            destacar(e)
             log(f"    digitar: {texto}")
             e.fill(texto)
         elif valor(e).strip():
@@ -1496,8 +1482,7 @@ def cadastrar_endereco(d, nome, endereco):
     try:
         esperar_ate(lambda: enderecos_da_parte(d))
     except TempoEsgotado:
-        msgs = " | ".join(e.inner_text() for e in d.query_selector_all(".rich-messages, .alert-danger") if e.inner_text().strip())
-        raise Problema(f"O PJe não incluiu o endereço de {nome}: {msgs or 'sem mensagem'}. Cadastre no Chrome e "
+        raise Problema(f"O PJe não incluiu o endereço de {nome}: {mensagens_da_tela(d, ERRO_NA_TELA) or 'sem mensagem'}. Cadastre no Chrome e "
                        "clique em Tentar de novo.")
     avisos.append(f"Endereço de {nome} cadastrado no PJe a partir da inicial: {endereco}.")
 
@@ -1675,9 +1660,14 @@ def recuperar(id_rascunho):
         esperar(ESPERA_PJE_FORA)
     entrar(d)  # se a sessão caiu, faz o login; se não, só confere o painel
     if id_rascunho:
-        d.goto(URL_RASCUNHO.format(id_rascunho))
-        esperar_ate(lambda: d.query_selector("[id='tabPartes_lbl']"))
-        aguardar(d)
+        abrir_rascunho(d, id_rascunho)
+
+
+def abrir_rascunho(d, id_rascunho):
+    """Reabre um rascunho do PJe e espera a tela dele carregar."""
+    d.goto(URL_RASCUNHO.format(id_rascunho))
+    esperar_ate(lambda: d.query_selector("[id='tabPartes_lbl']"))
+    aguardar(d)
 
 
 def guardar_tela(nome_cliente, etapa):

@@ -13,7 +13,7 @@ import sys
 import time
 import novo_processo as robo
 
-ARQUIVO = os.path.join(robo.SISTEMA, "mapa_pje.json")
+ARQUIVO = robo.ARQUIVO_MAPA
 MATERIA, JURISDICAO, COMPETENCIA, CLASSE = "areaDireitoCombo", "jurisdicaoCombo", "comboConflitoCompetencia", "classeJudicialCombo"
 
 
@@ -26,9 +26,7 @@ def carregar():
 
 def gravar(mapa):
     mapa["atualizado_em"] = time.strftime("%Y-%m-%d %H:%M")
-    with open(ARQUIVO + ".tmp", "w", encoding="utf-8") as f:
-        json.dump(mapa, f, ensure_ascii=False, indent=1)
-    os.replace(ARQUIVO + ".tmp", ARQUIVO)  # a interface lê o arquivo: nunca deixar pela metade
+    robo.gravar_json(ARQUIVO, mapa, indent=1)  # a interface lê o arquivo: nunca pela metade
 
 
 def opcoes(d, campo):
@@ -81,13 +79,8 @@ def mapear(d, progresso=robo.log, do_zero=False):
 
 def mapear_rascunho(d, id_processo, progresso=robo.log):
     """Listas que só aparecem dentro de um rascunho. Só lê: abre abas e o modal de parte, não salva."""
-    def abrir():
-        d.goto(robo.URL_RASCUNHO.format(id_processo))
-        robo.esperar_ate(lambda: d.query_selector("[id='tabPartes_lbl']"))
-        robo.aguardar(d)
-
     mapa = carregar()
-    abrir()
+    robo.abrir_rascunho(d, id_processo)
     robo.clicar(d, "[id='processoPrioridadeProcesso_lbl']")
     prioridades = opcoes(d, "prioridadeProcesso")
     robo.clicar(d, "[id='novoAnexo_lbl']")
@@ -96,7 +89,7 @@ def mapear_rascunho(d, id_processo, progresso=robo.log):
         .map(r => { const l = document.querySelector("label[for='" + r.id + "']"); return l ? l.textContent.trim() : ''; })"""
     tipos_parte = {}
     for polo, nome in (("A", "ativo"), ("P", "passivo")):
-        abrir()
+        robo.abrir_rascunho(d, id_processo)
         robo.clicar(d, "[id='tabPartes_lbl']")
         robo.visivel(d, f"#addParte{polo}").query_selector("xpath=..").click()
         modal = "[id^='mpAssociarParteProcesso'] select"

@@ -2,8 +2,7 @@
 ao robô do escritório da pessoa (um app_web.py por escritório, em 127.0.0.1).
 A página sai do Firebase Hosting (https://<ROBO_SITE>.web.app, publicada por publicar_pagina.py) e fala com este
 servidor em outro endereço: por isso a sessão é uma chave assinada que a página manda no cabeçalho Authorization
-(cookie não vai entre endereços diferentes) e só a página do Firebase pode chamar (CORS). Sem ROBO_SITE, a página
-sai daqui mesmo, como antes.
+(cookie não vai entre endereços diferentes) e só a página do Firebase pode chamar (CORS).
 O escritório sai SEMPRE da sessão + escritorios.json, nunca do pedido.
 Ambiente: ROBO_RAIZ (/srv/robo), ROBO_CHAVE_SESSAO, FIREBASE_API_KEY, ROBO_PORTA_PORTEIRO (8800), ROBO_SITE (autus).
 Uso (servidor/porteiro.service): python porteiro.py
@@ -17,10 +16,11 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from urllib.parse import quote, urlparse
-from flask import Flask, Response, abort, jsonify, redirect, request, send_file, send_from_directory
+from urllib.parse import quote
+from flask import Flask, Response, abort, jsonify, redirect, request
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 import escritorio_novo
+from publicar_pagina import token_da_maquina
 
 RAIZ = os.environ.get("ROBO_RAIZ", "/srv/robo")
 ARQUIVO_ESCRITORIOS = os.path.join(RAIZ, "escritorios.json")
@@ -32,10 +32,9 @@ MAX_PEDIDOS = 300  # a lista de pedidos não cresce sem fim (qualquer conta Goog
 LIGAR_ESCRITORIO = ["sudo", "-n", "/usr/local/sbin/autus-ligar-escritorio"]  # ligar_escritorio.sh, dono root
 API_KEY = os.environ["FIREBASE_API_KEY"]
 PORTA = int(os.environ.get("ROBO_PORTA_PORTEIRO", 8800))
-WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sistema", "web")
-SITE = os.environ.get("ROBO_SITE", "")  # o site do Firebase Hosting onde a página fica
-PAGINA = f"https://{SITE}.web.app" if SITE else ""
-ORIGENS = {PAGINA, f"https://{SITE}.firebaseapp.com"} if SITE else set()  # quem pode chamar o servidor de fora
+SITE = os.environ.get("ROBO_SITE") or "autus"  # o site do Firebase Hosting onde a página fica
+PAGINA = f"https://{SITE}.web.app"
+ORIGENS = {PAGINA, f"https://{SITE}.firebaseapp.com"}  # quem pode chamar o servidor de fora
 VALIDADE_SESSAO = 12 * 3600  # 12 h desde o login
 VALIDADE_QR = 5 * 60  # o QR do autenticador (a chave do código do PJe) só sai até 5 min depois de entrar
 # a regra de senha fica no Firebase (Authentication > Settings > Password policy): mínimo 10 e pelo menos um número
@@ -89,15 +88,13 @@ def auditar(email, acao, **detalhes):
         f.write(json.dumps(linha, ensure_ascii=False) + "\n")
 
 
-def token_da_maquina():
-    """Token da conta de serviço da máquina do Google (None fora dela)."""
+def ler_json(arquivo):
+    """O arquivo JSON, ou {} se ainda não existe (ou ficou pela metade)."""
     try:
-        pedido = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/"
-                                        "default/token", headers={"Metadata-Flavor": "Google"})
-        with urllib.request.urlopen(pedido, timeout=3) as r:
-            return json.load(r)["access_token"]
-    except Exception:
-        return None
+        with open(arquivo, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, ValueError):
+        return {}
 
 
 def firebase(acao, corpo, como_maquina=False):
@@ -105,8 +102,11 @@ def firebase(acao, corpo, como_maquina=False):
     como_maquina: vai também com a conta da máquina (e-mail de criar senha: sem ela, o link sai sem a chave de API
     e a página do Firebase dá 'The selected page mode is invalid')."""
     cabecalhos = {"Content-Type": "application/json"}
-    if como_maquina and (token := token_da_maquina()):
-        cabecalhos["Authorization"] = "Bearer " + token
+    if como_maquina:
+        try:
+            cabecalhos["Authorization"] = "Bearer " + token_da_maquina()
+        except Exception:  # fora da máquina do Google: vai sem
+            pass
     pedido = urllib.request.Request(f"https://identitytoolkit.googleapis.com/v1/accounts:{acao}?key={API_KEY}",
                                     data=json.dumps(corpo).encode("utf-8"), headers=cabecalhos)
     try:
@@ -131,7 +131,7 @@ def pedir_nova_senha(email):
     """O Firebase manda o e-mail de criar senha nova. Não diz se o e-mail existe. Com a página no Firebase Hosting, a
     página de criar senha do Firebase termina com um botão Continuar que leva para ela (o link do e-mail não dá
     para mudar: o Firebase bloqueia os modelos de e-mail deste projeto sem domínio próprio)."""
-    corpo = {"requestType": "PASSWORD_RESET", "email": email, **({"continueUrl": PAGINA + "/"} if PAGINA else {})}
+    corpo = {"requestType": "PASSWORD_RESET", "email": email, "continueUrl": PAGINA + "/"}
     try:
         firebase("sendOobCode", corpo, como_maquina=True)
     except Exception:
@@ -163,42 +163,28 @@ def ler_sessao():
         dados, desde = assinador.loads(chave, max_age=VALIDADE_SESSAO, return_timestamp=True)
     except BadSignature:  # inclui SignatureExpired
         return None
-    return None if dados.get("id") in encerradas() else {**dados, "desde": desde.timestamp()}
-
-
-def encerradas():
-    try:
-        with open(ARQUIVO_ENCERRADAS, encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, ValueError):
-        return {}
+    return None if dados.get("id") in ler_json(ARQUIVO_ENCERRADAS) else {**dados, "desde": desde.timestamp()}
 
 
 def encerrar(id_):
     """Sair: a chave para de valer na hora (fica anotada até vencer sozinha; as vencidas saem da lista)."""
     with trava_encerradas:
         agora = time.time()
-        lista = {i: fim for i, fim in encerradas().items() if fim > agora}
+        lista = {i: fim for i, fim in ler_json(ARQUIVO_ENCERRADAS).items() if fim > agora}
         lista[id_] = agora + VALIDADE_SESSAO
-        with open(ARQUIVO_ENCERRADAS + ".tmp", "w", encoding="utf-8") as f:
-            json.dump(lista, f)
-        os.replace(ARQUIVO_ENCERRADAS + ".tmp", ARQUIVO_ENCERRADAS)
+        escritorio_novo.gravar(ARQUIVO_ENCERRADAS, lista)
 
 
 # ---------- rotas ----------
 
-def origem_permitida(origem):
-    return origem in ORIGENS or urlparse(origem).netloc == request.host
-
-
 @app.before_request
 def mesma_origem():
-    """POST só da própria página: a do Firebase Hosting ou a servida aqui. O pedido de licença do navegador (OPTIONS,
-    antes de mandar a chave para outro endereço) é respondido aqui."""
+    """POST só da página do Firebase Hosting. O pedido de licença do navegador (OPTIONS, antes de mandar a chave
+    para outro endereço) é respondido aqui."""
     origem = request.headers.get("Origin")
     if request.method == "OPTIONS":
-        return ("", 204) if origem and origem_permitida(origem) else abort(403)
-    if request.method == "POST" and origem and not origem_permitida(origem):
+        return ("", 204) if origem in ORIGENS else abort(403)
+    if request.method == "POST" and origem and origem not in ORIGENS:
         abort(403)
 
 
@@ -219,26 +205,11 @@ def proibido(e):
     return jsonify(erro="Pedido recusado."), 403
 
 
-@app.errorhandler(413)
-def grande_demais(e):
-    return jsonify(erro="Envio grande demais: o limite é 200 MB por vez. Envie menos pastas de cada vez."), 413
-
-
 @app.get("/")
 @app.get("/nova-senha")  # link do e-mail de criar senha (a página monta o formulário a partir do caminho)
 def pagina():
-    if PAGINA:  # a página fica no Firebase Hosting: quem chega pelo endereço do servidor vai para lá
-        return redirect(PAGINA + request.full_path.rstrip("?"), 302)
-    r = send_file(os.path.join(WEB, "index.html"))
-    r.headers["Cache-Control"] = "no-cache"
-    return r
-
-
-@app.get("/fontes/<path:nome>")
-def fonte(nome):
-    if not nome.endswith(".woff2"):
-        abort(404)
-    return send_from_directory(os.path.join(WEB, "fontes"), nome, max_age=31536000)
+    """A página fica no Firebase Hosting: quem chega pelo endereço do servidor vai para lá."""
+    return redirect(PAGINA + request.full_path.rstrip("?"), 302)
 
 
 @app.get("/saude")
@@ -258,11 +229,18 @@ def entrar():
         return jsonify(erro="Não consegui falar com o serviço de login. Tente de novo em instantes."), 502
     if not certo:
         return jsonify(erro="E-mail ou senha errados."), 401
-    if not escritorio_do_email(email) and not eh_admin(email):
+    if not (chave := liberar(email, "entrou")):
         return jsonify(erro="Este e-mail não está ligado a nenhum escritório."), 403
+    return jsonify(ok=True, sessao=chave)
+
+
+def liberar(email, acao):
+    """A chave da sessão de quem tem acesso (um escritório ou administrador, que fica no registro); None se não tem."""
     if eh_admin(email):
-        auditar(email, "entrou")
-    return jsonify(ok=True, sessao=nova_sessao(email))
+        auditar(email, acao)
+    elif not escritorio_do_email(email):
+        return None
+    return nova_sessao(email)
 
 
 def conferir_google(credencial):
@@ -279,28 +257,14 @@ def conferir_google(credencial):
     return {"email": dados["email"].strip().lower(), "nome": str(dados.get("name", ""))[:120]}
 
 
-def ler_pedidos():
-    try:
-        with open(ARQUIVO_PEDIDOS, encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, ValueError):
-        return {}
-
-
-def gravar_pedidos(pedidos):
-    with open(ARQUIVO_PEDIDOS + ".tmp", "w", encoding="utf-8") as f:
-        json.dump(pedidos, f, ensure_ascii=False, indent=2)
-    os.replace(ARQUIVO_PEDIDOS + ".tmp", ARQUIVO_PEDIDOS)
-
-
 def registrar_pedido(email, nome):
     """Conta Google que ainda não foi liberada: fica esperando o administrador (um pedido por e-mail)."""
     with trava_pedidos:
-        pedidos = ler_pedidos()
+        pedidos = ler_json(ARQUIVO_PEDIDOS)
         if email in pedidos or len(pedidos) >= MAX_PEDIDOS:
             return
         pedidos[email] = {"nome": nome, "quando": time.strftime("%Y-%m-%dT%H:%M:%S")}
-        gravar_pedidos(pedidos)
+        escritorio_novo.gravar(ARQUIVO_PEDIDOS, pedidos)
 
 
 @app.post("/entrar-google")
@@ -316,10 +280,8 @@ def entrar_google():
     if not quem:
         return jsonify(erro="Não consegui confirmar a sua conta Google. Tente de novo."), 401
     email = quem["email"]
-    if escritorio_do_email(email) or eh_admin(email):
-        if eh_admin(email):
-            auditar(email, "entrou (Google)")
-        return jsonify(ok=True, sessao=nova_sessao(email))
+    if chave := liberar(email, "entrou (Google)"):
+        return jsonify(ok=True, sessao=chave)
     registrar_pedido(email, quem["nome"])
     return jsonify(erro=f"A conta {email} ainda não tem acesso. O pedido foi enviado ao administrador do Autus: "
                         "assim que o acesso for liberado, é só entrar de novo com o Google.", pedido=True), 403
@@ -399,13 +361,16 @@ def admin_da_sessao():
     return email
 
 
+def do_robo(porta, caminho, segundos):
+    """GET no robô do escritório (127.0.0.1); erro de rede, resposta não-200 (HTTPError é OSError) ou JSON ruim sobem."""
+    with urllib.request.urlopen(f"http://127.0.0.1:{porta}{caminho}", timeout=segundos) as r:
+        return json.load(r)
+
+
 def situacao_do_robo(porta):
     """parado, trabalhando, pausado (esperando alguém) ou fora do ar, pela consulta do próprio robô."""
     try:
-        conexao = http.client.HTTPConnection("127.0.0.1", porta, timeout=2)
-        conexao.request("GET", "/api/estado?desde=999999999")
-        estado = json.loads(conexao.getresponse().read())
-        conexao.close()
+        estado = do_robo(porta, "/api/estado?desde=999999999", 2)
     except (OSError, ValueError):
         return "fora do ar"
     return "pausado" if estado.get("pausa") else "trabalhando" if estado.get("tarefa") else "parado"
@@ -418,7 +383,7 @@ def admin_escritorios():
     lista = [{"id": id_, "nome": e["nome"], "emails": e["emails"], "robo": situacao_do_robo(e["porta"])}
              for id_, e in sorted(dados["escritorios"].items(), key=lambda par: par[1]["nome"].lower())]
     return jsonify(escritorios=lista, admins=dados.get("admins", []), google=bool(GOOGLE_CLIENT),
-                   pedidos=sorted(({"email": e, **p} for e, p in ler_pedidos().items()), key=lambda p: p["quando"]))
+                   pedidos=sorted(({"email": e, **p} for e, p in ler_json(ARQUIVO_PEDIDOS).items()), key=lambda p: p["quando"]))
 
 
 @app.post("/admin/pedidos/liberar")
@@ -435,9 +400,9 @@ def admin_liberar_pedido():
         except SystemExit as e:
             return jsonify(erro=str(e)), 400
     with trava_pedidos:
-        pedidos = ler_pedidos()
+        pedidos = ler_json(ARQUIVO_PEDIDOS)
         pedidos.pop(email, None)
-        gravar_pedidos(pedidos)
+        escritorio_novo.gravar(ARQUIVO_PEDIDOS, pedidos)
     auditar(email_admin, "liberou pedido de acesso (Google)", escritorio=id_, emails=[email])
     return jsonify(ok=True)
 
@@ -447,10 +412,10 @@ def admin_recusar_pedido():
     email_admin = admin_da_sessao()
     email = str((request.get_json(silent=True) or {}).get("email", "")).strip().lower()
     with trava_pedidos:
-        pedidos = ler_pedidos()
+        pedidos = ler_json(ARQUIVO_PEDIDOS)
         if pedidos.pop(email, None) is None:
             return jsonify(erro="Esse pedido não existe mais."), 404
-        gravar_pedidos(pedidos)
+        escritorio_novo.gravar(ARQUIVO_PEDIDOS, pedidos)
     auditar(email_admin, "recusou pedido de acesso (Google)", emails=[email])
     return jsonify(ok=True)
 
@@ -535,12 +500,7 @@ def admin_emails(id_):
 def erros_do_robo(porta, dias):
     """Os problemas recentes de um escritório (/api/erros do robô dele); None se o robô estiver fora do ar."""
     try:
-        conexao = http.client.HTTPConnection("127.0.0.1", porta, timeout=10)
-        conexao.request("GET", f"/api/erros?dias={dias}")
-        resposta = conexao.getresponse()
-        dados = json.loads(resposta.read()) if resposta.status == 200 else None
-        conexao.close()
-        return dados["erros"] if dados else None
+        return do_robo(porta, f"/api/erros?dias={dias}", 10)["erros"]
     except (OSError, ValueError, KeyError):
         return None
 
@@ -550,8 +510,7 @@ def admin_erros():
     """Os problemas de todos os escritórios juntos (ou de um, ?escritorio=), do mais novo ao mais antigo, e os tipos
     que mais se repetem. Escritório com o robô fora do ar aparece em 'sem_resposta'."""
     admin_da_sessao()
-    dias = request.args.get("dias", "7")
-    dias = min(max(int(dias), 1), 90) if dias.isdigit() else 7
+    dias = min(max(request.args.get("dias", 7, type=int), 1), 90)
     so = request.args.get("escritorio", "")
     lista, sem_resposta = [], []
     for id_, e in ler_escritorios()["escritorios"].items():

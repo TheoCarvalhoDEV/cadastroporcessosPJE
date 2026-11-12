@@ -16,7 +16,6 @@ PASTAS
     mapear_pje.py              lê do PJe todas as opções da tela Novo processo (Configurações > Opções do PJe).
     mapa_pje.json              essas opções, já lidas (matéria > jurisdição > competência > classe, tipos de
                                documento, prioridades, tipos de parte). Vale para todo escritório do TJMT.
-    gerar_cadastro_docx.py     cria o "Cadastro de Ação Judicial - ....docx" nas pastas que não têm (modelo da JVO).
 
   dados_do_escritorio\      -> SÓ DESTE ESCRITÓRIO. Não copiar para outro.
     config.json                CPF, senha e chave do autenticador do PJe (e o QR dela, para outros celulares).
@@ -44,7 +43,7 @@ PASTAS DE CLIENTES (na pasta escolhida em Configurações; padrão: a pasta que 
   rascunho.json             -> o rascunho que o robô já criou no PJe: um novo cadastro continua dele.
   Cliente cadastrado sem erro vai para "Concluído".
 
-NO SERVIDOR (o escritório usa só o navegador; projeto: docs\superpowers\specs\2026-11-09-robo-na-nuvem-design.md)
+NO SERVIDOR (o escritório usa só o navegador; como está montado: docs\ESTADO-DO-PROJETO.md)
   Uma máquina Ubuntu do Google em São Paulo roda um robô (app_web.py) por escritório, com as variáveis ROBO_* do
   modo servidor: pastas dos clientes enviadas pela página, login do PJe no Secret Manager, Chrome sem janela.
   A página fica em https://autus.web.app (Firebase Hosting) e fala com o servidor por trás.
@@ -54,10 +53,9 @@ NO SERVIDOR (o escritório usa só o navegador; projeto: docs\superpowers\specs\
   servidor\publicar_pagina.py  publica a página, a Política de Privacidade e os Termos no Firebase Hosting.
   servidor\ligar_escritorio.sh liga o robô de um escritório novo (a única parte com root; o porteiro chama com sudo).
   servidor\montar.sh           monta a máquina:  sudo bash montar.sh <dominio> <chave-de-api-do-firebase> [site]
-  servidor\escritorio_novo.py  escritório novo (ou mais e-mails num que existe); o administrador também faz isso
-                               pela página, em Escritórios:
-                                 sudo /srv/robo/venv/bin/python /srv/robo/codigo/servidor/escritorio_novo.py jvo "JVO" a@b.com
-                               cada e-mail recebe o link para criar a senha. Administrador do Autus (só por aqui):
+  servidor\escritorio_novo.py  o escritorios.json. Escritório novo e e-mails: o administrador faz pela página, em
+                               Escritórios (cada e-mail recebe o link para criar a senha). Administrador do Autus
+                               (só por aqui):
                                  sudo /srv/robo/venv/bin/python /srv/robo/codigo/servidor/escritorio_novo.py --admin a@b.com
   servidor\atualizar.sh        pega o código novo do GitHub, reinicia cada robô quando ele estiver parado, publica a
                                página no Firebase e reinicia o porteiro.

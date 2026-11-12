@@ -1,16 +1,11 @@
-"""Entra um escritório no servidor, ou mais e-mails num escritório que já existe. Rodar como root no servidor:
-  sudo /srv/robo/venv/bin/python /srv/robo/codigo/servidor/escritorio_novo.py <id> "<nome>" <email> [<email>...]
-Escritório novo: cria a pasta, o segredo do login do PJe (Secret Manager, guardado em São Paulo) e liga o robô
-(systemd robo@<id>). Para cada e-mail: cria o usuário no Firebase e manda o link de criar senha.
-Depois, o escritório entra na página e preenche Ajustes > Login do PJe.
-Administrador do Autus (vê todos os escritórios na página; a lista só muda por aqui, nunca pela página):
-  sudo /srv/robo/venv/bin/python /srv/robo/codigo/servidor/escritorio_novo.py --admin <email>
-O administrador também cria escritórios e libera e-mails pela página (porteiro.py + ligar_escritorio.sh)."""
+"""O escritorios.json do servidor (escritórios, e-mails liberados e administradores), usado pelo porteiro.
+Escritórios e e-mails o administrador cria e libera pela página (porteiro.py + ligar_escritorio.sh). Pela linha de
+comando, só o administrador do Autus (a página não promove ninguém). Rodar como root no servidor:
+  sudo /srv/robo/venv/bin/python /srv/robo/codigo/servidor/escritorio_novo.py --admin <email>"""
 import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 
 RAIZ = os.environ.get("ROBO_RAIZ", "/srv/robo")
@@ -92,36 +87,12 @@ def carregar_env(caminho):
 
 
 if __name__ == "__main__":
-    arquivo = os.path.join(RAIZ, "escritorios.json")
-    if len(sys.argv) == 3 and sys.argv[1] == "--admin":
-        email = adicionar_admin(arquivo, sys.argv[2])
-        shutil.chown(arquivo, "robo", "robo")
-        carregar_env(os.path.join(RAIZ, "porteiro.env"))
-        import porteiro
-        porteiro.criar_usuario(email)
-        porteiro.pedir_nova_senha(email)
-        print(f"Administrador {email} pronto. O link de criar senha foi para o e-mail.")
-        sys.exit(0)
-    if len(sys.argv) < 4:
+    if len(sys.argv) != 3 or sys.argv[1] != "--admin":
         sys.exit(__doc__)
-    id_, nome, emails = sys.argv[1], sys.argv[2], sys.argv[3:]
-    novo = id_ not in ler(arquivo)["escritorios"]
-    porta = adicionar(arquivo, id_, nome, emails)
+    arquivo = os.path.join(RAIZ, "escritorios.json")
+    email = adicionar_admin(arquivo, sys.argv[2])
     shutil.chown(arquivo, "robo", "robo")
-    if novo:
-        pasta = os.path.join(RAIZ, "escritorios", id_)
-        os.makedirs(os.path.join(pasta, "clientes"), exist_ok=True)
-        with open(os.path.join(pasta, "robo.env"), "w", encoding="utf-8") as f:
-            f.write(f"ROBO_PORTA={porta}\nROBO_ESCRITORIO={id_}\n")
-        for raiz, pastas, arquivos in os.walk(pasta):
-            for n in [raiz] + [os.path.join(raiz, a) for a in pastas + arquivos]:
-                shutil.chown(n, "robo", "robo")
-        subprocess.run(["gcloud", "secrets", "create", f"pje-login-{id_}", "--replication-policy=user-managed",
-                        "--locations=southamerica-east1"], check=True)
-        subprocess.run(["systemctl", "enable", "--now", f"robo@{id_}"], check=True)
     carregar_env(os.path.join(RAIZ, "porteiro.env"))
     import porteiro
-    for email in emails:
-        porteiro.criar_usuario(email.strip().lower())
-        porteiro.pedir_nova_senha(email.strip().lower())
-    print(f"Escritório '{id_}' pronto (porta {porta}). E-mails com o link de criar senha: {', '.join(emails)}.")
+    porteiro.mandar_links([email])
+    print(f"Administrador {email} pronto. O link de criar senha foi para o e-mail.")
