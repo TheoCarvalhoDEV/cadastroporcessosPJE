@@ -36,7 +36,7 @@ cliente (navegador) ──► https://autus.web.app   (página, no Firebase Host
 
 | Peça | Onde | O que faz |
 |---|---|---|
-| Página | `sistema/web/index.html`, publicada no Firebase Hosting pelo `servidor/publicar_pagina.py` | Toda a tela: entrar, cadastro, ajustes, relatório, administrador. Fala com o servidor por trás. |
+| Página | `sistema/web/index.html`, publicada no Firebase Hosting pelo `servidor/publicar_pagina.py` | Toda a tela: entrar, início, cadastro, ajustes, relatório, administrador. Fala com o servidor por trás. |
 | Porteiro | `servidor/porteiro.py` | Login (Firebase e Google), chave de sessão, pedidos de acesso, painel do administrador, repasse para o robô de cada escritório. |
 | Robô | `sistema/app_web.py` + `sistema/novo_processo.py` | Um processo por escritório. Lê as pastas, conversa com a página e dirige o Chrome no PJe (Playwright). |
 | Leitura do PJe | `sistema/mapear_pje.py` → `sistema/mapa_pje.json` | As opções reais da tela Novo processo do TJMT (matéria > jurisdição > competência > classe...). |

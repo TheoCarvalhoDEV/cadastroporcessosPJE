@@ -25,7 +25,7 @@ import mapear_pje
 PORTA = int(os.environ.get("ROBO_PORTA", 8765))  # no servidor, cada escritório tem a sua (servidor/robo@.service)
 os.makedirs(robo.DADOS, exist_ok=True)  # cópia nova (GitHub) vem sem dados_do_escritorio
 PAGINA = os.path.join(robo.SISTEMA, "web", "index.html")
-COR_PADRAO = "#2454B4"
+COR_PADRAO = "#5A33F0"  # o roxo do logo (marca/)
 
 CAMPOS = [  # (chave do robô, nome na tela) - mesma ordem do Corrigir dados da janela antiga
     ("matéria", "Matéria"), ("jurisdição", "Jurisdição"), ("competência", "Competência"),
@@ -104,19 +104,6 @@ def mover_para(pasta, subpasta):
     shutil.move(pasta, destino)
     os.utime(destino)
     return destino
-
-
-def ler_json(caminho):
-    if not os.path.exists(caminho):
-        return {}
-    with open(caminho, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def gravar_json(caminho, dados):
-    with open(caminho + ".tmp", "w", encoding="utf-8") as f:
-        json.dump(dados, f, ensure_ascii=False, indent=2)
-    os.replace(caminho + ".tmp", caminho)
 
 
 tarefas = queue.Queue()
@@ -310,7 +297,7 @@ def mapear(rascunho, do_zero):
         mapear_pje.mapear(d, do_zero=do_zero)
     finally:
         robo.PAUSA_SEGUNDOS = pausa
-        robo._mapa = None  # a leitura das iniciais passa a usar as opções novas
+        robo.mapa_pje.cache_clear()  # a leitura das iniciais passa a usar as opções novas
 
 
 # ---------- páginas e API ----------
@@ -357,7 +344,7 @@ def ver_estado():
 def ver_escritorio():
     pje = robo.ler_config()
     return jsonify(servidor=robo.SERVIDOR,
-        nome=escritorio.get("nome", ""), cor=escritorio.get("cor", COR_PADRAO), pasta_clientes=raiz(),
+        nome=escritorio.get("nome", ""), cor=escritorio.get("cor", COR_PADRAO), logo=escritorio.get("logo", ""), pasta_clientes=raiz(),
         assistente_feito=bool(escritorio.get("assistente_feito")),  # o primeiro acesso (assistente da página) terminou
         pausa_segundos=robo.PAUSA_SEGUNDOS, raca_padrao=robo.RACA_PADRAO, prefixo_anexo=robo.PREFIXO_ANEXO,
         anexo_primeiro=robo.TIPOS_ANEXO[0], anexo_demais=robo.TIPOS_ANEXO[1], rotulos_docx=robo.ROTULOS_DOCX,
@@ -384,6 +371,9 @@ def salvar_escritorio():
         erros.append("a pasta de clientes não existe neste computador")
     if not re.fullmatch(r"#[0-9a-fA-F]{6}", novo.get("cor", "")):
         erros.append("cor inválida")
+    # a logo vem da página já encolhida (PNG de 96 px); só PNG em base64 e pequeno, nada de SVG nem endereço de fora
+    if not re.fullmatch(r"(data:image/png;base64,[A-Za-z0-9+/=]{1,100000})?", novo.get("logo") or ""):
+        erros.append("logo inválida")
     if pje.get("cpf") and not robo.cpf_valido(re.sub(r"\D", "", pje["cpf"])):
         erros.append("CPF do login do PJe inválido")
     for c, v in novo.get("partes_conhecidas", {}).items():
@@ -395,7 +385,7 @@ def salvar_escritorio():
     if erros:
         abort(400, "Confira: " + "; ".join(erros) + ".")
     novo["pausa_segundos"] = float(novo.get("pausa_segundos") or 0)
-    gravar_json(robo.ARQUIVO_ESCRITORIO, novo)
+    robo.gravar_json(robo.ARQUIVO_ESCRITORIO, novo)
     antigo = robo.ler_config()
     config = dict(antigo)  # o config.json tem outras chaves (folder_path, headless): mantém
     for chave in ("cpf", "senha", "totp_key"):
@@ -421,7 +411,8 @@ def ver_mapa():
     except OSError:
         return jsonify({})
     if _mapa_cache["chave"] != chave:
-        bruto = json.dumps(ler_json(mapear_pje.ARQUIVO), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        with open(mapear_pje.ARQUIVO, "rb") as f:
+            bruto = f.read()
         _mapa_cache.update(chave=chave, bruto=bruto, gzip=gzip.compress(bruto, 6),
                            etag='"' + hashlib.sha1(bruto).hexdigest()[:16] + '"')
     cab = {"ETag": _mapa_cache["etag"], "Cache-Control": "no-cache", "Vary": "Accept-Encoding"}
@@ -638,8 +629,21 @@ def apagar_cliente(nome):
         abort(403, "No modo local, apague a pasta no computador.")
     if estado["tarefa"] == "cadastrar":
         abort(409, "Espere o robô terminar para apagar.")
-    mover_para(pasta_do_cliente(nome), "Lixeira")
-    return jsonify(ok=True)
+    destino = mover_para(pasta_do_cliente(nome), "Lixeira")
+    return jsonify(ok=True, lixeira=os.path.basename(destino))  # o nome lá dentro: é com ele que a página desfaz
+
+
+@app.post("/api/lixeira/<nome>/restaurar")
+def restaurar_cliente(nome):
+    """O "Desfazer" do aviso: a pasta volta da Lixeira para a lista (nome repetido ganha ' (2)')."""
+    if not robo.SERVIDOR:
+        abort(403, "No modo local, apague a pasta no computador.")
+    lixeira = os.path.join(raiz(), "Lixeira")
+    if not nome_seguro(nome) or not os.path.isdir(os.path.join(lixeira, nome)):
+        abort(404, "Essa pasta não está mais na Lixeira.")
+    destino = os.path.join(raiz(), nome_livre(raiz(), nome))
+    shutil.move(os.path.join(lixeira, nome), destino)
+    return jsonify(ok=True, cliente=os.path.basename(destino))
 
 
 @app.post("/api/cadastrar")
@@ -848,20 +852,19 @@ def ver_relatorio():
 
 @app.get("/api/foto/<nome>")
 def foto(nome):
-    caminho = os.path.join(robo.DADOS, "erros", os.path.basename(nome))  # só fotos de erros/
-    if not nome.endswith(".png") or not os.path.exists(caminho):
+    if not nome.endswith(".png"):  # só fotos de erros/ (send_from_directory não deixa sair da pasta)
         abort(404, "Foto não encontrada.")
-    return send_file(caminho)
+    return send_from_directory(os.path.join(robo.DADOS, "erros"), nome)
 
 
 @app.get("/api/pagina-salva/<nome>")
 def pagina_salva(nome):
     """A página do PJe salva junto com a foto da pausa (para investigar o erro). Vai como arquivo para baixar, nunca
     aberta aqui: é HTML do PJe."""
-    caminho = os.path.join(robo.DADOS, "erros", os.path.basename(nome))
-    if not nome.endswith(".html") or not os.path.exists(caminho):
+    if not nome.endswith(".html"):
         abort(404, "Página salva não encontrada.")
-    return send_file(caminho, mimetype="application/octet-stream", as_attachment=True, download_name=os.path.basename(nome))
+    return send_from_directory(os.path.join(robo.DADOS, "erros"), nome, mimetype="application/octet-stream",
+                               as_attachment=True)
 
 
 # o que conta como problema na aba Erros do administrador (o "sozinho" é engasgo que o robô resolveu)
@@ -872,7 +875,7 @@ DESFECHO = {"parada": "parou com erro", "pausa": "pausou", "sozinho": "resolveu 
 def erros_recentes():
     """Os problemas dos últimos dias (máx. 90), do mais novo ao mais antigo, para a aba Erros do administrador (o
     porteiro junta os de todos os escritórios)."""
-    dias = min(max(int(request.args.get("dias", "7")) if request.args.get("dias", "7").isdigit() else 7, 1), 90)
+    dias = min(max(request.args.get("dias", 7, type=int), 1), 90)
     desde = (datetime.datetime.now() - datetime.timedelta(days=dias)).strftime("%Y-%m-%dT%H:%M:%S")
     lista = []
     for e in ler_historico():

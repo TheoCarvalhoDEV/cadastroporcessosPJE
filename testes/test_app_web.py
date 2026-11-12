@@ -50,6 +50,10 @@ def test_configuracao_e_correcao():
             assert r.status_code == 200, r.get_json()
             with open(config, encoding="utf-8") as f:
                 assert json.load(f) == {"cpf": "11144477735", "senha": "segredo", "totp_key": "ABC", "headless": False}
+            r = web.post("/api/escritorio", json={**corpo, "logo": "data:image/svg+xml;base64,AAAA", "pje": {}})  # só PNG
+            assert r.status_code == 400 and "logo" in r.get_json()["erro"]
+            assert web.post("/api/escritorio", json={**corpo, "logo": "data:image/png;base64,iVBORw0KGgo=", "pje": {}}).status_code == 200
+            assert web.get("/api/escritorio").get_json()["logo"] == "data:image/png;base64,iVBORw0KGgo="
             assert cfg["assistente_feito"] is False  # escritório que nunca passou pelo primeiro acesso
             assert web.post("/api/escritorio", json={**corpo, "assistente_feito": True, "pje": {}}).status_code == 200
             assert web.get("/api/escritorio").get_json()["assistente_feito"] is True
@@ -388,9 +392,16 @@ def test_apagar_cliente():
             assert web.post("/api/clientes/Fulana/apagar").status_code == 409
         finally:
             app_web.estado["tarefa"] = ""
-        assert web.post("/api/clientes/Fulana/apagar").status_code == 200
+        r = web.post("/api/clientes/Fulana/apagar")
+        assert r.status_code == 200 and r.get_json()["lixeira"] == "Fulana"
         assert os.listdir(os.path.join(raiz, "Lixeira")) == ["Fulana"] and "Fulana" not in os.listdir(raiz)
+        # Desfazer: volta para a lista; nome que não está na Lixeira (ou caminho) não passa
+        assert web.post("/api/lixeira/..%2Fx/restaurar").status_code == 404
+        r = web.post("/api/lixeira/Fulana/restaurar")
+        assert r.status_code == 200 and r.get_json()["cliente"] == "Fulana" and "Fulana" in os.listdir(raiz)
+        assert web.post("/api/lixeira/Fulana/restaurar").status_code == 404
     assert web.post("/api/clientes/Fulana/apagar").status_code == 403
+    assert web.post("/api/lixeira/Fulana/restaurar").status_code == 403
 
 
 def test_texto_da_peticao():
