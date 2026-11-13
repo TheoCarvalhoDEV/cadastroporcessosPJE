@@ -459,6 +459,10 @@ def test_leitor_ia_le_as_pastas_pendentes():
         assert app_web.tipo_do_problema(parada["problema"]) == "Leitura pela IA"
         app_web.ler_pendentes_ia()  # falhou agora há pouco: não tenta de novo na mesma hora
         assert app_web.ler_historico()[-1] == parada
+        app_web.acordar_ia.clear()
+        assert web.post("/api/clientes/Fulana/ler-de-novo").status_code == 200  # "Ler de novo agora" na página
+        assert robo.estado_ia(pasta) == "pendente" and app_web.acordar_ia.is_set()  # o leitor acorda e lê já
+        assert web.post("/api/clientes/Outra/ler-de-novo").status_code == 404
     with mock.patch.object(robo, "SERVIDOR", False), mock.patch.object(robo, "DADOS", tmp), \
          mock.patch.object(robo, "ler_com_ia", lambda c: 1 / 0):
         app_web.ler_pendentes_ia()  # modo local: não lê

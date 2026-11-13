@@ -307,8 +307,6 @@
   .au .confira .in{border-color:var(--warn)}
   .au .confira .btn-p{background:var(--ink);border-color:var(--ink);color:var(--surface)}.au .confira .btn-p:hover{background:var(--ink-2);border-color:var(--ink-2)}
   .au .res{margin:0}
-  .au .res>div{display:flex;gap:16px;padding:13px 0;border-bottom:1px solid var(--line)}
-  .au .res dt{flex:0 0 130px;color:var(--ink-3)}.au .res dd{margin:0;font-weight:500;min-width:0;overflow-wrap:anywhere}
   .au .resumo .fic-rodape{position:static;margin:0;padding:16px 0 0;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent}
   /* ficha + petição lado a lado */
   .au .avt-lg{width:44px;height:44px;font-size:var(--fs-lg);border-radius:16px}
@@ -370,7 +368,7 @@
     .au .main{padding:16px 16px 40px}
     .au .faixas{padding:0 16px}.au .faixas>.banner{margin-top:12px}
     .au .cad-lista{max-width:none}
-    .au .resumo{padding:22px 18px}.au .res dt{flex-basis:104px}
+    .au .resumo{padding:22px 18px}.au .res-k{flex-basis:104px}
     .au .cad-split.vendo-robo>.cad-detalhe{order:-1}
     .au .fic-pdf{position:static}
     .au .fic-pdf .desk{max-height:70vh;min-height:0;padding:12px}
@@ -544,6 +542,89 @@
   .au .t-base{font-size:var(--fs-base)!important}.au .t-lg{font-size:var(--fs-lg)!important}.au .t-xl{font-size:var(--fs-xl)!important}
   .au .t-2xl{font-size:var(--fs-2xl)!important}.au .t-3xl{font-size:var(--fs-3xl)!important}
 
+
+  /* a IA lendo: caixa com borda em degradê girando, brilho em volta, folhas sendo varridas e campos aparecendo */
+  @property --ia-ang{syntax:"<angle>";inherits:false;initial-value:0deg}
+  .au .ia-caixa{position:relative;isolation:isolate;border-radius:22px;padding:2px;background:conic-gradient(from var(--ia-ang),#5A33F0,#22D3EE,#E5489B,#F2B33D,#5A33F0);animation:ia-girar 4s linear infinite}
+  .au .ia-caixa::before{content:"";position:absolute;inset:8px;z-index:-1;border-radius:22px;background:inherit;filter:blur(24px);opacity:.55}
+  .au .ia-dentro{position:relative;overflow:hidden;border-radius:20px;background:var(--surface);padding:24px 26px;display:flex;flex-wrap:wrap;gap:24px;align-items:center}
+  .au .ia-aurora{position:absolute;inset:-30%;pointer-events:none;animation:ia-aurora 9s ease-in-out infinite alternate;
+    background:radial-gradient(closest-side,rgba(90,51,240,.16),transparent) 15% 25%/45% 55% no-repeat,radial-gradient(closest-side,rgba(34,211,238,.14),transparent) 80% 40%/40% 55% no-repeat,radial-gradient(closest-side,rgba(229,72,155,.12),transparent) 50% 90%/40% 45% no-repeat}
+  .au .ia-dentro>.col{position:relative}
+  .au .ia-docs{position:relative;width:100px;height:116px;flex:none}
+  .au .ia-folha{position:absolute;width:66px;height:86px;border-radius:9px;background:#fff;box-shadow:0 6px 18px rgba(40,20,120,.18);display:flex;flex-direction:column;gap:7px;padding:13px 10px}
+  .au .ia-folha i{display:block;height:4px;border-radius:2px;background:#DDD7F6}
+  .au .ia-folha i:nth-child(2n){width:72%}
+  .au .ia-f1{left:0;top:16px;transform:rotate(-9deg);opacity:.7}.au .ia-f2{left:30px;top:6px;transform:rotate(7deg);opacity:.85}.au .ia-f3{left:16px;top:20px}
+  .au .ia-f3 i{animation:ia-linha 2.4s ease-in-out infinite}
+  .au .ia-f3 i:nth-child(2){animation-delay:.3s}.au .ia-f3 i:nth-child(3){animation-delay:.6s}.au .ia-f3 i:nth-child(4){animation-delay:.9s}.au .ia-f3 i:nth-child(5){animation-delay:1.2s}.au .ia-f3 i:nth-child(6){animation-delay:1.5s}
+  .au .ia-feixe{position:absolute;left:8px;right:22px;height:3px;top:20px;border-radius:3px;background:linear-gradient(90deg,transparent,#22D3EE,#7C5CFF,transparent);box-shadow:0 0 14px 3px rgba(34,211,238,.6);animation:ia-feixe 2.2s ease-in-out infinite}
+  .au .ia-pct{position:absolute;right:0;bottom:0;padding:3px 10px;border-radius:999px;font-size:var(--fs-sm);color:#fff;background:linear-gradient(90deg,#5A33F0,#E5489B);box-shadow:0 6px 16px rgba(90,51,240,.4)}
+  .au .ia-ic{width:22px;height:22px;color:#7C5CFF;animation:ia-pulsar 1.6s ease-in-out infinite}
+  .au .ia-titulo{background:linear-gradient(90deg,var(--ink) 0 35%,#7C5CFF 44%,#22D3EE 50%,#E5489B 56%,var(--ink) 65% 100%);background-size:260% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ia-brilho 2.8s linear infinite}
+  .au .ia-barra{height:8px}
+  .au .ia-barra>i{background:linear-gradient(90deg,#5A33F0,#22D3EE,#E5489B,#5A33F0);background-size:300% 100%;animation:ia-fluxo 2s linear infinite;box-shadow:0 0 12px rgba(124,92,255,.55)}
+  .au .ia-chips{gap:8px;min-height:30px}
+  .au .ia-chip{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 12px;border-radius:999px;font-size:var(--fs-xs);font-weight:600;color:#4B2BD6;opacity:0;
+    background:linear-gradient(90deg,rgba(90,51,240,.10),rgba(34,211,238,.12));box-shadow:inset 0 0 0 1px rgba(90,51,240,.22);animation:ia-chip 5.4s ease-in-out infinite}
+  .au-dark .ia-chip,.au-dark .ia-selo{color:#C9BDFF}
+  .au .ia-selo{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:999px;font-size:var(--fs-xs);font-weight:600;color:#4B2BD6;border:1.5px solid transparent;
+    background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(90deg,#5A33F0,#22D3EE,#E5489B) border-box}
+  @keyframes ia-girar{to{--ia-ang:360deg}}
+  @keyframes ia-aurora{to{transform:translate(4%,-3%) rotate(8deg)}}
+  @keyframes ia-feixe{0%{top:18px;opacity:0}12%,88%{opacity:1}100%{top:100px;opacity:0}}
+  @keyframes ia-linha{0%,100%{background-color:#DDD7F6}45%{background-color:#A996FF}}
+  @keyframes ia-pulsar{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.2);opacity:1}}
+  @keyframes ia-brilho{from{background-position:100% 0}to{background-position:-160% 0}}
+  @keyframes ia-fluxo{to{background-position:-300% 0}}
+  @keyframes ia-chip{0%{opacity:0;transform:translateY(6px) scale(.92)}8%,70%{opacity:1;transform:none}82%,100%{opacity:0;transform:translateY(-4px)}}
+  @media (prefers-reduced-motion:reduce){.au .ia-chip{opacity:1}.au .ia-feixe{display:none}}
+
+  /* resumo: cada linha é um botão que abre o editor do campo ali mesmo */
+  .au .res{display:flex;flex-direction:column}
+  .au .res-l{display:flex;align-items:center;gap:16px;width:100%;padding:13px 12px;margin:0 -12px;width:calc(100% + 24px);border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;text-align:left;color:inherit;font:inherit}
+  .au .res-k{flex:0 0 150px;color:var(--ink-3)}.au .res-v{flex:1 1 auto;font-weight:500;min-width:0;overflow-wrap:anywhere}
+  .au .res-btn{cursor:pointer;transition:background .15s}
+  .au .res-btn:hover,.au .res-btn[aria-expanded="true"]{background:var(--ac-soft);border-radius:12px}
+  .au .res-lapis{color:var(--ac-ink);opacity:0;transition:opacity .15s}
+  .au .res-btn:hover .res-lapis,.au .res-btn:focus-visible .res-lapis,.au .res-btn[aria-expanded="true"] .res-lapis{opacity:1}
+  .au .res-ed:not(:empty){padding:10px 0 16px}
+  @media (pointer:coarse){.au .res-lapis{opacity:.6}}
+
+  /* ficha completa: cada campo é uma caixa separada, com cara de campo que se altera (lápis; ao passar o mouse, a borda acende) */
+  .au .fic-ficha button.fr{position:relative;border:1px solid var(--line);background:var(--surface);border-radius:12px;margin:0 0 8px;padding:10px 46px 11px 14px;
+    box-shadow:0 1px 2px rgba(16,24,40,.04);transition:border-color .15s,box-shadow .15s,background .15s}
+  .au .fic-ficha button.fr::after{content:"";position:absolute;right:15px;bottom:13px;width:16px;height:16px;background:var(--ac-ink);opacity:.35;transition:opacity .15s;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z'/%3E%3C/svg%3E") center/contain no-repeat}
+  .au .fic-ficha button.fr:hover:not([disabled]){border-color:var(--ac-line);background:var(--surface);box-shadow:0 0 0 3px var(--ac-soft)}
+  .au .fic-ficha button.fr:hover:not([disabled])::after,.au .fic-ficha button.fr:focus-visible::after,.au .fic-ficha button.fr.on::after{opacity:1}
+  .au .fic-ficha button.fr[disabled]::after{display:none}
+  .au .fic-ficha button.fr.on{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-soft);background:var(--surface)}
+  .au .fic-ficha button.fr.pend{border-color:var(--warn-line);background:var(--warn-bg)}
+  .au .fic-ficha .fr-v{margin-top:3px}
+  .au .fic-ficha .blk-h{padding:18px 4px 8px}
+  .au .fic-ficha .ed{margin:-4px 0 12px}
+
+  /* caixinhas de marcar da lista: quadradinho arredondado na cor do Autus, com o ✓ entrando */
+  .au .cl input[type=checkbox]{appearance:none;-webkit-appearance:none;width:22px;height:22px;margin:0;flex:none;border-radius:7px;border:1.5px solid var(--line-2);background:var(--surface);
+    display:grid;place-items:center;cursor:pointer;transition:background .15s,border-color .15s,box-shadow .15s}
+  .au .cl input[type=checkbox]::after{content:"";width:13px;height:13px;background:#fff;transform:scale(0);transition:transform .18s cubic-bezier(.3,1.6,.6,1);
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/contain no-repeat}
+  .au .cl input[type=checkbox]:checked{background:var(--ac);border-color:var(--ac);box-shadow:0 3px 8px color-mix(in oklab,var(--ac) 35%,transparent)}
+  .au .cl input[type=checkbox]:checked::after{transform:scale(1)}
+  .au .cl input[type=checkbox]:hover:not(:disabled){border-color:var(--ac)}
+  .au .cl input[type=checkbox]:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+  .au .cl input[type=checkbox]:disabled{opacity:.5;cursor:not-allowed}
+  .au .cl-marca:hover{background:transparent}
+  /* lixeira de cada linha: aparece ao passar o mouse (no celular fica sempre) */
+  .au .cl-apagar{flex:none;opacity:0;color:var(--ink-3);transition:opacity .15s,color .15s,background .15s}
+  .au .cl:hover .cl-apagar,.au .cl-apagar:focus-visible{opacity:1}
+  .au .cl-apagar:hover{color:var(--err);background:var(--err-bg)}
+  @media (pointer:coarse){.au .cl-apagar{opacity:.7}}
+  .au .aviso-revisao{background:var(--warn-bg);box-shadow:inset 0 0 0 1px var(--warn-line);align-items:flex-start}
+  .au .aviso-revisao>.ic{margin-top:3px}
   /* pergunta no estilo do Autus (confirmar) */
   .au .dlg{border:0;padding:0;border-radius:18px;background:var(--surface);color:var(--ink);box-shadow:var(--shadow-2);width:min(460px,calc(100vw - 32px))}
   .au .dlg::backdrop{background:rgba(12,10,30,.45)}
@@ -611,6 +692,7 @@
 <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"></path></symbol>
 <symbol id="i-skip" viewBox="0 0 24 24"><path d="M5 4l10 8-10 8zM19 5v14"></path></symbol>
 <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"></path></symbol>
+<symbol id="i-brilho" viewBox="0 0 24 24"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></symbol>
 <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8h10M7 12h10M7 16h6"></path></symbol>
 <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol>
 <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></symbol>
@@ -1229,7 +1311,9 @@ function itemDaLista(nome, { marcavel, sub, selo: s, pct, tom = "3", dica }) {
       marcavel || tom === "warn" ? null : h("span", { class: "dot cl-dot t-" + tom, "aria-hidden": "true" }),  // "Falta conferir": o alerta já está no título do grupo
       h("span", { class: "col grow cl-txt" }, h("span", { class: "cl-nome ellipsis" }, principal), linhaSub,
         barra ? h("span", { class: "bar bar-sm", "aria-hidden": "true" }, barra) : null),
-      s ? selo(s) : null));
+      s ? selo(s) : null),
+    podeApagar(nome) ? h("button", { class: "ib ib-sm cl-apagar", type: "button", "aria-label": `Mover ${principal} para a Lixeira`, title: "Mover para a Lixeira",
+      onclick: () => apagarCliente(nome) }, ic("trash", "ic-sm")) : null);
 }
 function desenharLista() {
   const passa = nome => !filtro || parecido(nome).includes(parecido(filtro));
@@ -1460,6 +1544,7 @@ function desenharFicha(nome, r, novo) {
       seloCli ? selo(seloCli) : null, botaoApagar(nome, principal)),
     estadoIA,
     lendo ? null : faixaLida,
+    ia && ia.estado === "lida" ? avisoRevisao() : null,
     r.campos.length ? h("div", { class: "fic-split" }, sheet, pdf)
       : h("div", { class: "banner", role: "alert" }, ic("alert", "t-warn"), h("p", { class: "grow" }, h("b", {}, "Falta conferir a pasta. "), r.problema || "Não deu para montar a ficha deste cliente."))));
   desenharSalvo();
@@ -1484,27 +1569,40 @@ function desenharResumo({ nome, r, s, res, ocupado, principal, acao, nArquivos, 
     f.aberto = chave; b.setAttribute("aria-expanded", "true");
     encher(ed, editorDe(chave, valorDe(chave) ? "Está certo" : "Salvar"));
   }
-  const frase = (lidaPelaIA ? "A IA leu a petição. " : "A petição foi lida pelas regras de texto. ")
+  f.conferir = new Set(aConferir.map(a => a[0]));  // "Está certo" só para o que pede conferência
+  const frase = (lidaPelaIA ? "" : "A petição foi lida pelas regras de texto. ")
     + (n === 1 ? "Só 1 campo precisa da sua conferência." : n ? `${n} campos precisam da sua conferência.` : r.problema ? "Falta conferir a pasta." : "Nenhum campo precisa de conferência.");
   const v = k => valorMostrado(k, valorDe(k));
-  const linhas = [[titulo(valorDe("tipo ativo")) || "Autor", v("nome completo")], [titulo(valorDe("tipo passivo")) || "Réu", v("entidade")], ["Ação", acao],
-    ["Assunto", v("assunto principal")], ["Competência", v("competência")], ["Valor da causa", v("valor da causa")],
-    ["Documentos", nArquivos ? `${nArquivos} ${nArquivos === 1 ? "arquivo" : "arquivos"}` : ""]].filter(([k, val]) => k !== "Ação" || val);
+  const linhas = [[titulo(valorDe("tipo ativo")) || "Autor", "nome completo"], [titulo(valorDe("tipo passivo")) || "Réu", "entidade"], ["Ação", "", acao],
+    ["Assunto", "assunto principal"], ["Competência", "competência"], ["Valor da causa", "valor da causa"],
+    ["Documentos", "", nArquivos ? `${nArquivos} ${nArquivos === 1 ? "arquivo" : "arquivos"}` : ""]].filter(([k, , val]) => k !== "Ação" || val);
+  // clicar na linha abre o editor ali mesmo (sem ir para a ficha completa); o que já está em "Confira" abre lá em cima
+  const linhaRes = ([rotulo, chave, fixo]) => {
+    if (!chave) return h("div", { class: "res-l" }, h("span", { class: "res-k" }, rotulo), h("span", { class: "res-v" }, fixo || "—"));
+    const btn = h("button", { type: "button", class: "res-l res-btn", "aria-expanded": "false", disabled: ocupado, title: ocupado ? null : "Clique para alterar",
+        onclick: () => abrirCampo(chave) },
+      h("span", { class: "res-k" }, rotulo), h("span", { class: "res-v" }, v(chave) || "—"), ocupado ? null : ic("pencil", "ic-sm res-lapis"));
+    const ed = h("div", { class: "res-ed" });
+    if (!f.conferir.has(chave)) f.linhas[chave] = [btn, ed, rotulo];
+    return [btn, ed];
+  };
   const comSelo = seloCli && ((r.ia && r.ia.estado === "pendente") || !["pronto", "problema"].includes(s));
   // com campos a conferir, o aviso da pasta já está na lista "Confira": o rodapé não repete
   const rodape = n && r.problema && !["processando", "pausado", "fila"].includes(s) ? null : rodapeDaFicha(nome, r, s, res);
   encher($("#ficha"), h("div", { class: "card resumo col" },
     h("div", { class: "row wrap g-12 a-ini" },
-      h("div", { class: "col grow g-6 min-220" }, h("h2", { class: "h1" }, principal), h("p", { class: "t-2" }, frase)),
+      h("div", { class: "col grow g-6 min-220" }, h("h2", { class: "h1" }, principal),
+        h("p", { class: "t-2 row wrap g-8" }, lidaPelaIA ? h("span", { class: "ia-selo" }, ic("brilho", "ic-sm"), "Lida pela IA") : null, frase)),
       comSelo ? selo(seloCli) : null,
       r.rascunho ? h("span", { class: "bd", title: "O próximo cadastro continua deste rascunho, sem criar outro." }, `Rascunho ${r.rascunho} no PJe`) : null,
       botaoApagar(nome, principal)),
+    lidaPelaIA ? avisoRevisao() : null,
     estadoIA,
     n ? h("section", { class: "confira col", "aria-label": "Para conferir" },
       h("h3", { class: "h3" }, n === 1 ? "Confira este campo" : `Confira estes ${n} campos`),
       r.problema ? h("p", { class: "t-sm" }, r.problema) : null, itens) : null,
     h("span", { class: "row t-xs t-2 g-5", id: "salvo", "aria-live": "polite", hidden: true }),
-    h("dl", { class: "res" }, linhas.map(([k, val]) => h("div", {}, h("dt", {}, k), h("dd", {}, val || "—")))),
+    h("div", { class: "res" }, linhas.map(linhaRes)),
     h("button", { class: "link-ac self-ini", id: "ver-completa", type: "button",
       onclick: () => { fichaCompleta = true; desenharFicha(nome, r, false); } }, "Ver a ficha completa", ic("arrow", "ic-sm")),
     rodape));
@@ -1543,7 +1641,7 @@ function abrirCampo(chave) {
   if (!f.aberto) return;
   const [b, ed] = f.linhas[chave];
   b.setAttribute("aria-expanded", "true");
-  encher(ed, editorDe(chave, f.resumo && valorDe(chave) ? "Está certo" : "Salvar"));
+  encher(ed, editorDe(chave, f.resumo && f.conferir && f.conferir.has(chave) && valorDe(chave) ? "Está certo" : "Salvar"));
   const alvo = ed.querySelector("input, select, .opt[aria-pressed=true], .opt");
   if (alvo) alvo.focus();
 }
@@ -1662,16 +1760,19 @@ function rodapeDaFicha(nome, r, s, res) {
 // a IA lendo esta petição: anel com %, tempo, barra e as 3 etapas (estimativa pelo tempo: uns 30 s)
 function cartaoLeitura() {
   const R2 = refLeitura = { etapa: -1 };
-  const card = h("div", { class: "card card-p leitura" },
-    h("div", { class: "ring-wrap", "aria-hidden": "true" }, svg("svg", { class: "ring", viewBox: "0 0 48 48" },
-      svg("circle", { class: "ring-bg", cx: 24, cy: 24, r: 21 }), R2.anel = svg("circle", { class: "ring-fg", cx: 24, cy: 24, r: 21 })), R2.pct = h("span")),
-    h("div", { class: "grow min-260" },
-      h("div", { class: "row wrap" }, h("span", { class: "h3" }, "A IA está lendo a petição"),
+  const folha = n => h("span", { class: "ia-folha ia-f" + n }, h("i"), h("i"), h("i"), h("i"), h("i"), h("i"));
+  const card = h("div", { class: "ia-caixa" }, h("div", { class: "ia-dentro" },
+    h("div", { class: "ia-aurora", "aria-hidden": "true" }),
+    h("div", { class: "ia-docs", "aria-hidden": "true" }, folha(1), folha(2), folha(3), h("span", { class: "ia-feixe" }), R2.pct = h("b", { class: "ia-pct num" })),
+    h("div", { class: "col grow min-260 g-10" },
+      h("div", { class: "row wrap g-8" }, ic("brilho", "ia-ic"), h("span", { class: "h3 ia-titulo" }, "A IA está lendo a petição"),
         h("span", { class: "sp mono t-2 num" }, R2.tempo = h("span"), h("span", { class: "t-3" }, " · leva cerca de 30 s"))),
-      R2.barra = h("div", { class: "bar", style: "margin:10px 0 12px", role: "progressbar", "aria-label": "Leitura pela IA (estimativa)", "aria-valuemin": "0", "aria-valuemax": "100" }, h("i")),
+      R2.barra = h("div", { class: "bar ia-barra", role: "progressbar", "aria-label": "Leitura pela IA (estimativa)", "aria-valuemin": "0", "aria-valuemax": "100" }, h("i")),
       R2.etapas = h("div", { class: "row wrap", style: "gap:6px 20px" }),
-      R2.agora = h("p", { class: "t-sm t-2 mt-8", "aria-live": "polite" })),
-    h("p", { class: "t-xs t-3 w-100" }, "Os dados entram na ficha quando a IA terminar. Pode fechar esta página: a leitura continua e o cliente aparece em “Falta conferir” ou “Prontos para cadastrar”."));
+      h("div", { class: "row wrap ia-chips", "aria-hidden": "true" }, ["Requerente", "CPF", "Réu", "Assunto", "Competência", "Valor da causa"]
+        .map((t, i) => h("span", { class: "ia-chip", style: `animation-delay:${(i * 0.9).toFixed(1)}s` }, ic("check", "ic-sm"), t))),
+      R2.agora = h("p", { class: "t-sm t-2", "aria-live": "polite" }),
+      h("p", { class: "t-xs t-3" }, "Os dados entram na ficha quando a IA terminar. Pode fechar esta página: a leitura continua e o cliente aparece em “Falta conferir” ou “Prontos para cadastrar”."))));
   atualizarLeitura();
   return card;
 }
@@ -1680,7 +1781,6 @@ function atualizarLeitura() {
   const R2 = refLeitura;
   if (!R2) return;
   const seg = est.ia_segundos || 0, pct = pctLeitura(), etapa = seg < 9 ? 0 : seg < 18 ? 1 : 2;
-  R2.anel.style.strokeDashoffset = (131.95 * (1 - pct / 100)).toFixed(1);
   R2.pct.textContent = pct + "%";
   R2.tempo.textContent = mmss(seg);
   R2.barra.firstChild.style.width = pct + "%";
@@ -1703,21 +1803,45 @@ function cartaoFila(nome) {
       : "A IA lê uma petição por vez. Esta começa em instantes."),
     h("p", { class: "t-sm t-3 max-440" }, "Enquanto isso, a ficha abaixo mostra o que as regras de texto acharam."));
 }
+// depois da leitura da IA: revisar é obrigatório antes de cadastrar (a IA pode errar)
+const avisoRevisao = () => h("div", { class: "banner aviso-revisao", role: "note" }, ic("alert", "t-warn"),
+  h("p", { class: "grow" }, h("b", {}, "Revisão obrigatória antes de cadastrar. "),
+    "A IA leu a petição, mas pode errar. Confira os dados com a petição antes de mandar o robô cadastrar: o que for para o PJe é responsabilidade do escritório."));
+function motivoDaFalha(erro) {
+  const e = erro || "";
+  if (/\b(401|403)\b|Unauthorized|Forbidden|PERMISSION/i.test(e)) return "O Google recusou a conta do robô no serviço de IA (falta de permissão ou acesso vencido). Clique em Ler de novo agora; se continuar, avise o administrador do Autus.";
+  if (/\b429\b|RESOURCE_EXHAUSTED|quota|cota/i.test(e)) return "O serviço de IA do Google está no limite de uso agora. Clique em Ler de novo agora daqui a pouco.";
+  if (/\b5\d\d\b|timed? ?out|tempo esgotado|URLError|conex/i.test(e)) return "O serviço de IA do Google não respondeu (rede ou instabilidade). Clique em Ler de novo agora.";
+  return e ? e.replace(/\.?$/, ".") : "A leitura falhou.";
+}
 function cartaoFalhou(ia) {
+  const nome = atual;
+  const deNovo = h("button", { class: "btn btn-p", type: "button", onclick: async () => {
+    deNovo.disabled = true;
+    try { await api("/api/clientes/" + encodeURIComponent(nome) + "/ler-de-novo", {}); await carregarClientes(); }
+    catch (e) { deNovo.disabled = false; avisar(e.message); }
+  } }, ic("brilho"), "Ler de novo agora");
   return h("div", { class: "card falhou", role: "alert" },
     h("div", { class: "row falhou-h" }, ic("alert", "t-err"), h("span", { class: "h3 grow" }, "A IA não conseguiu ler esta petição")),
     h("div", { class: "col card-p g-8" },
-      h("p", {}, ia.erro ? ia.erro.replace(/\.?$/, ".") : "A leitura falhou."),
+      h("p", {}, motivoDaFalha(ia.erro)),
+      cfg.servidor ? h("div", {}, deNovo) : null,
+      ia.erro && motivoDaFalha(ia.erro) !== ia.erro.replace(/\.?$/, ".") ? h("p", { class: "t-xs t-3 mono" }, "Detalhe: " + ia.erro) : null,
       h("p", { class: "t-sm t-2" }, "A ficha foi preenchida pelas regras de texto: confira os campos abaixo. A IA tenta ler de novo sozinha em 30 minutos. Se a petição for uma foto ou um escaneamento sem texto, salve de novo a partir do Word (Arquivo › Salvar como › PDF) e envie a pasta outra vez.")));
 }
 // servidor: tirar o cliente da lista (vai para a Lixeira do escritório, que se esvazia sozinha)
+const podeApagar = nome => cfg.servidor && !est.tarefa && clientes.some(c => c.nome === nome);
 function botaoApagar(nome, principal) {
-  if (!cfg.servidor || est.tarefa || !clientes.some(c => c.nome === nome)) return null;
-  // sem pergunta antes: move na hora e o aviso traz "Desfazer" (a Lixeira se esvazia sozinha em 30 dias)
-  return h("button", { class: "ib", type: "button", "aria-label": `Mover ${principal} para a Lixeira`, title: "Mover para a Lixeira", onclick: async () => {
+  if (!podeApagar(nome)) return null;
+  return h("button", { class: "ib", type: "button", "aria-label": `Mover ${principal} para a Lixeira`, title: "Mover para a Lixeira", onclick: () => apagarCliente(nome) }, ic("trash"));
+}
+// sem pergunta antes: move na hora e o aviso traz "Desfazer" (a Lixeira se esvazia sozinha em 30 dias)
+async function apagarCliente(nome) {
+  const [principal] = partesDoNome(nome);
     try {
       const { lixeira } = await api("/api/clientes/" + encodeURIComponent(nome) + "/apagar", {});
-      atual = null; textos.delete(nome);
+      if (atual === nome) atual = null;
+      textos.delete(nome);
       await carregarClientes();
       mostrarToast(`${principal} foi para a Lixeira.`, false, ["Desfazer", async () => {
         try {
@@ -1729,7 +1853,6 @@ function botaoApagar(nome, principal) {
       // o botão da lixeira sumiu com a ficha: o foco vai para o "Desfazer" (com o foco nele, o aviso espera)
       if (!document.activeElement || document.activeElement === document.body) $("#toast .toast-x").focus();
     } catch (e) { avisar(e.message); }
-  } }, ic("trash"));
 }
 function desenharConcluido(nome, res) {
   ficha = null;
@@ -3218,6 +3341,8 @@ async function enviarPastas(selecionados) {
     await carregarClientes();
     mostrarEnvio(dados.clientes, fora.concat(dados.ignorados));
     if (!$("#tela-inicio").hidden) mostrarTela("cadastro");  // enviou pelo Início: o resultado aparece no topo da lista
+    // já abre quem acabou de entrar: a caixa da IA lendo aparece sozinha, sem precisar clicar no cliente
+    if (dados.clientes.length) await abrirCliente(dados.clientes[0], true);
   } catch (e) { avisar(e.name === "AbortError" ? "O envio passou de 10 minutos e foi cancelado. Envie menos pastas de cada vez." : e.message); }
   finally { clearTimeout(tempo); enviando(0); }
 }

@@ -622,6 +622,19 @@ def enviar_pastas():
     return jsonify(clientes=list(nomes.values()), ignorados=ignorados)
 
 
+@app.post("/api/clientes/<path:nome>/ler-de-novo")
+def ler_de_novo(nome):
+    """A leitura pela IA falhou: tenta agora, sem esperar os 30 minutos (apaga a falha anotada e acorda o leitor)."""
+    if not robo.SERVIDOR:
+        abort(403, "A leitura pela IA só funciona no servidor do Autus.")
+    try:
+        os.remove(os.path.join(pasta_do_cliente(nome), robo.ARQUIVO_LEITURA_IA))
+    except FileNotFoundError:
+        pass
+    acordar_ia.set()
+    return jsonify(ok=True)
+
+
 @app.post("/api/clientes/<path:nome>/apagar")
 def apagar_cliente(nome):
     """Move a pasta do cliente para a Lixeira do escritório (no servidor ela se esvazia sozinha em 30 dias)."""
