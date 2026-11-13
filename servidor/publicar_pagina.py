@@ -15,6 +15,8 @@ WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sistema", 
 HOSTING = "https://firebasehosting.googleapis.com/v1beta1/"
 META_VAZIA = '<meta name="api" content="">'
 META_GOOGLE = '<meta name="google-client" content="">'  # ID do cliente OAuth do botão do Google (vazio: sem botão)
+META_LIGAR = '<meta name="ligar" content="">'  # servidor/ligar.py no Cloud Run: a página liga a máquina parada
+LIGAR = os.environ.get("ROBO_LIGAR", "").strip().rstrip("/")  # vazio: a página não tenta ligar (máquina sempre ligada)
 
 
 def configuracao(api, google=False):
@@ -22,7 +24,7 @@ def configuracao(api, google=False):
     Com o login do Google, libera só o que o botão oficial do Google usa (accounts.google.com/gsi)."""
     gsi = " https://accounts.google.com/gsi/" if google else ""
     politica = "; ".join([
-        "default-src 'self'", f"connect-src 'self' {api}{gsi}", "img-src 'self' data: blob:" + (" https://*.googleusercontent.com" if google else ""),
+        "default-src 'self'", f"connect-src 'self' {api}{gsi}{' ' + LIGAR if LIGAR else ''}", "img-src 'self' data: blob:" + (" https://*.googleusercontent.com" if google else ""),
         f"style-src 'self' 'unsafe-inline'{gsi}", f"script-src 'self' 'unsafe-inline'{' https://accounts.google.com/gsi/client' if google else ''}",
         "font-src 'self'", f"frame-src{gsi}" if google else "frame-src 'none'",
         "frame-ancestors 'none'", "base-uri 'none'", "form-action 'self'", "object-src 'none'"])
@@ -44,6 +46,7 @@ def arquivos(api, google_client=""):
             raise SystemExit("index.html sem a linha " + meta)
     pagina = pagina.replace(META_VAZIA, f'<meta name="api" content="{api}">')
     pagina = pagina.replace(META_GOOGLE, f'<meta name="google-client" content="{google_client}">')
+    pagina = pagina.replace(META_LIGAR, f'<meta name="ligar" content="{LIGAR}">')
     saida = {"/index.html": pagina.encode("utf-8")}
     for nome in ("privacidade.html", "termos.html"):  # Política de Privacidade e Termos de Serviço
         with open(os.path.join(WEB, nome), "rb") as f:
@@ -93,5 +96,7 @@ if __name__ == "__main__":
     google_client = os.environ.get("ROBO_GOOGLE_CLIENT", "").strip()
     if google_client and not re.fullmatch(r"[0-9a-z-]+\.apps\.googleusercontent\.com", google_client):
         sys.exit("ROBO_GOOGLE_CLIENT não parece um ID de cliente OAuth do Google (termina em .apps.googleusercontent.com).")
+    if LIGAR and not re.fullmatch(r"https://[0-9a-z.-]+\.run\.app", LIGAR):
+        sys.exit("ROBO_LIGAR não parece o endereço do Cloud Run (https://....run.app).")
     enviados = publicar(site, api, token, google_client)
     print(f"Página publicada em https://{site}.web.app ({enviados} arquivo(s) novo(s)), falando com {api}")

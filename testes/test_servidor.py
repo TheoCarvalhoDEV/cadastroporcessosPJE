@@ -148,6 +148,50 @@ def test_publicar_pagina_no_firebase_hosting():
     assert atualizar.index("pull --ff-only") < atualizar.index("exec bash") < atualizar.index("uv pip install")
 
 
+
+def test_desligar_quando_ninguem_usa():
+    """A máquina desliga depois de 30 min sem uso, mas nunca com robô cadastrando, pausado ou com a IA lendo."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    import desligar_ocioso
+    raiz, agora = tempfile.mkdtemp(), time.time()
+    estado = {"tarefa": "", "pausa": None, "ia_lendo": ""}
+
+    class Robo(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200); self.end_headers(); self.wfile.write(json.dumps(estado).encode())
+        def log_message(self, *a): pass
+    robo = HTTPServer(("127.0.0.1", 0), Robo)
+    threading.Thread(target=robo.serve_forever, daemon=True).start()
+    os.makedirs(os.path.join(raiz, "escritorios", "jvo"))
+    with open(os.path.join(raiz, "escritorios", "jvo", "robo.env"), "w") as f:
+        f.write(f"ROBO_SERVIDOR=1\nROBO_PORTA={robo.server_port}\n")
+    open(os.path.join(raiz, "ultimo_uso"), "w").close()
+    desligar_ocioso.RAIZ = raiz
+    os.utime(os.path.join(raiz, "ultimo_uso"), (agora - 600, agora - 600))
+    assert not desligar_ocioso.deve_desligar()  # usado há 10 min
+    os.utime(os.path.join(raiz, "ultimo_uso"), (agora - 3600, agora - 3600))
+    assert desligar_ocioso.deve_desligar()  # 1 h sem uso e robô parado
+    for chave, valor in (("tarefa", "cadastrar"), ("pausa", {"etapa": "Assuntos"}), ("ia_lendo", "Fulana")):
+        estado[chave] = valor
+        assert not desligar_ocioso.deve_desligar(), chave
+        estado[chave] = "" if chave != "pausa" else None
+    robo.shutdown()
+    assert desligar_ocioso.deve_desligar()  # robô fora do ar não segura a máquina ligada
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "servidor", "atualizar.sh"), encoding="utf-8") as f:
+        assert "enable --now desligar.timer" in f.read()
+
+
+def test_pagina_sabe_ligar_a_maquina():
+    import publicar_pagina
+    from unittest import mock
+    api, ligar = "https://1-2-3-4.sslip.io", "https://autus-ligar-1.southamerica-east1.run.app"
+    with mock.patch.object(publicar_pagina, "LIGAR", ligar):
+        pagina = publicar_pagina.arquivos(api)["/index.html"].decode("utf-8")
+        politica = publicar_pagina.configuracao(api)["headers"][0]["headers"]["Content-Security-Policy"]
+    assert f'<meta name="ligar" content="{ligar}">' in pagina and f"connect-src 'self' {api} {ligar}" in politica
+
+
 if __name__ == "__main__":
     testes = [f for n, f in sorted(globals().items()) if n.startswith("test_")]
     for t in testes:

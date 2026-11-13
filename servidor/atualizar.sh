@@ -12,8 +12,10 @@ fi
 sudo -u robo env UV_PYTHON_INSTALL_DIR=/opt/uv-python uv pip install --no-config --python $RAIZ/venv/bin/python -q \
   -r $RAIZ/codigo/servidor/requisitos.txt
 cp $RAIZ/codigo/servidor/robo@.service $RAIZ/codigo/servidor/porteiro.service $RAIZ/codigo/servidor/limpar.service \
-   $RAIZ/codigo/servidor/limpar.timer /etc/systemd/system/
+   $RAIZ/codigo/servidor/limpar.timer $RAIZ/codigo/servidor/desligar.service $RAIZ/codigo/servidor/desligar.timer \
+   /etc/systemd/system/
 systemctl daemon-reload
+systemctl enable --now desligar.timer  # desliga a máquina depois de 30 min sem uso (servidor/ligar.py liga de novo)
 # administrador cria escritório pela página: o porteiro (robo) só pode rodar esta cópia com dono root, via sudo
 install -o root -g root -m 755 $RAIZ/codigo/servidor/ligar_escritorio.sh /usr/local/sbin/autus-ligar-escritorio
 echo 'robo ALL=(root) NOPASSWD: /usr/local/sbin/autus-ligar-escritorio' > /etc/sudoers.d/autus.novo

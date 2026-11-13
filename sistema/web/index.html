@@ -8,6 +8,8 @@
 <meta name="api" content="">
 <!-- ID do cliente OAuth do botão "Fazer login com o Google" (publicar_pagina.py preenche; vazio: sem o botão) -->
 <meta name="google-client" content="">
+<!-- servidor/ligar.py no Cloud Run: a máquina do robô desliga sozinha sem uso e a página liga de novo (vazio: sempre ligada) -->
+<meta name="ligar" content="">
 <title>Autus</title>
 <link rel="icon" href="data:,">
 <link rel="preload" href="/fontes/instrument-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -541,6 +543,54 @@
   .au .bloco{display:block}
   .au .t-base{font-size:var(--fs-base)!important}.au .t-lg{font-size:var(--fs-lg)!important}.au .t-xl{font-size:var(--fs-xl)!important}
   .au .t-2xl{font-size:var(--fs-2xl)!important}.au .t-3xl{font-size:var(--fs-3xl)!important}
+
+  /* pergunta no estilo do Autus (confirmar) */
+  .au .dlg{border:0;padding:0;border-radius:18px;background:var(--surface);color:var(--ink);box-shadow:var(--shadow-2);width:min(460px,calc(100vw - 32px))}
+  .au .dlg::backdrop{background:rgba(12,10,30,.45)}
+  .au .dlg-corpo{gap:12px;padding:24px}
+  .au .dlg-botoes{justify-content:flex-end;gap:8px;margin-top:8px}
+  .au .btn-perigo{background:var(--err);border-color:var(--err);color:#fff;font-weight:600}.au .btn-perigo:hover{background:color-mix(in oklab,var(--err) 86%,#000)}
+  @media (prefers-reduced-motion:no-preference){.au .dlg[open]{animation:autus-rise .18s ease}}
+
+  /* telas maiores: usam a largura e tudo cresce (escolha minha). 1100 px ou mais: um degrau; 1500 px ou mais (monitor
+     comum de escritório, 1920): dois degraus. Celular e tela pequena ficam como estavam. */
+  @media (min-width:1100px){
+    .au{--fs-2xs:12.5px;--fs-xs:13px;--fs-sm:14px;--fs-base:15.5px;--fs-lg:16.5px;--fs-xl:20px;--fs-2xl:22px;--fs-3xl:27px;--fs-4xl:34px;--fs-kpi:40px;--fs-hero:64px}
+    .au .topbar-in,.au .main,.au .faixas,.au .subnav-in{max-width:1640px;padding-left:36px;padding-right:36px}
+    .au .inicio{max-width:1240px}
+    .au .cad-lista{flex-basis:380px;max-width:420px}
+    .au .cad-split{gap:28px}
+    .au .btn{min-height:44px;padding:0 18px}.au .btn-lg{min-height:52px;padding:0 24px}.au .btn-sm{min-height:36px}
+    .au .in{height:48px;min-height:48px}
+    .au .nav{min-height:42px;padding:0 18px}
+    .au .ic{width:18px;height:18px}
+    .au .avt{width:40px;height:40px}.au .avt-lg{width:48px;height:48px}
+    .au .cl{padding:12px 14px}
+    .au .fr{min-height:58px;padding:11px 16px}
+    .au .page{max-width:760px}
+    .au .card-p{padding:24px 26px}
+    /* Ajustes em duas colunas: usa a largura em vez de uma coluna estreita */
+    .au .ajustes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start;max-width:none}
+    .au .ajustes>header,.au .ajustes>[aria-labelledby="aj-sabe"]{grid-column:1/-1}
+    .au .barra-salvar{max-width:none}
+  }
+  @media (min-width:1500px){
+    .au{--fs-2xs:13.5px;--fs-xs:14px;--fs-sm:15px;--fs-base:17px;--fs-lg:18px;--fs-xl:22px;--fs-2xl:25px;--fs-3xl:30px;--fs-4xl:38px;--fs-kpi:46px;--fs-hero:72px}
+    .au .topbar-in,.au .main,.au .faixas,.au .subnav-in{max-width:1760px;padding-left:44px;padding-right:44px}
+    .au .topbar-in{min-height:72px}
+    .au .inicio{max-width:1380px}
+    .au .cad-lista{flex-basis:440px;max-width:480px}
+    .au .cad-split{gap:32px}
+    .au .btn{min-height:48px;padding:0 20px;border-radius:13px}.au .btn-lg{min-height:58px;padding:0 28px}.au .btn-sm{min-height:40px}
+    .au .in{height:52px;min-height:52px}
+    .au .nav{min-height:46px;padding:0 20px}
+    .au .ic{width:20px;height:20px}
+    .au .avt{width:46px;height:46px}.au .avt-lg{width:56px;height:56px}
+    .au .cl{padding:14px 16px}
+    .au .fr{min-height:64px;padding:12px 18px}
+    .au .page{max-width:820px}
+    .au .card-p{padding:28px 30px}
+  }
 </style>
 </head>
 <body>
@@ -758,6 +808,17 @@ function h(tag, attrs = {}, ...filhos) {
   }
   for (const f of filhos.flat(Infinity)) if (f != null && f !== false) e.append(f.nodeType ? f : String(f));
   return e;
+}
+// pergunta no estilo do Autus, no lugar do confirm() do navegador; resolve true (sim) ou false (cancelar, Esc)
+function confirmar(titulo, texto, sim, perigo = false) {
+  return new Promise(ok => {
+    const d = h("dialog", { class: "dlg", "aria-labelledby": "dlg-t" }, h("form", { method: "dialog", class: "col dlg-corpo" },
+      h("h2", { class: "h2", id: "dlg-t" }, titulo), texto ? h("p", { class: "t-2" }, texto) : null,
+      h("div", { class: "row wrap dlg-botoes" }, h("button", { class: "btn", value: "nao" }, "Cancelar"),
+        h("button", { class: "btn " + (perigo ? "btn-perigo" : "btn-p"), value: "sim" }, sim))));
+    d.addEventListener("close", () => { ok(d.returnValue === "sim"); d.remove(); });
+    document.body.append(d); d.showModal();
+  });
 }
 const encher = (alvo, ...filhos) => alvo.replaceChildren(...filhos.flat(Infinity).filter(f => f != null && f !== false));
 // aberta direto do arquivo (dois cliques no index.html): sem o programa por trás nada funciona
@@ -1092,7 +1153,8 @@ function desenharFaixas() {
   document.title = p ? "(1) O robô precisa de você — Autus" : tituloBase;
   $("#faixa-reiniciando").hidden = !semConexao;
   if (semConexao) encher($("#faixa-reiniciando-txt"), cfg && cfg.servidor || API
-    ? [h("b", {}, "O robô do escritório está reiniciando."), " A página tenta de novo sozinha. Não precisa fazer nada: o que já foi feito está salvo."]
+    ? (LIGAR ? [h("b", {}, "Ligando o robô…"), " Ele desliga sozinho quando ninguém usa, para economizar. Leva de 1 a 2 minutos e a página continua sozinha."]
+      : [h("b", {}, "O robô do escritório está reiniciando."), " A página tenta de novo sozinha. Não precisa fazer nada: o que já foi feito está salvo."])
     : [h("b", {}, "Sem conexão com o programa."), " Confira se ele está aberto (Abrir cadastro.bat). A página tenta de novo sozinha."]);
   $("#faixa-offline").hidden = navigator.onLine;
   // pulou o primeiro acesso sem o login do PJe: lembra aqui, sem prender a pessoa no assistente (nos Ajustes o cartão já diz)
@@ -1240,7 +1302,8 @@ async function cadastrar(nomes) {
 }
 $("#cadastrar").addEventListener("click", () => cadastrar(selecionados()));
 $("#parar").addEventListener("click", async () => {
-  if (confirm("Parar o robô? O cliente que está no PJe fica como rascunho e o próximo cadastro continua dele.")) await api("/api/parar", {}).catch(e => avisar(e.message));
+  if (await confirmar("Parar o robô?", "O cliente que está no PJe fica como rascunho e o próximo cadastro continua dele.", "Parar o robô", true))
+    await api("/api/parar", {}).catch(e => avisar(e.message));
 });
 
 // ---------- ficha do cliente: linhas abertas (rótulo, origem e valor); o editor abre ao clicar ----------
@@ -2064,10 +2127,40 @@ function faixaFeito(nome) {
     h("button", { class: "ib ib-sm", type: "button", "aria-label": "Fechar aviso", onclick: () => { dispensado = nome; encher(R.feito); } }, ic("x", "ic-sm")));
 }
 
+// ---------- máquina que liga sozinha: sem uso por 30 min ela desliga (servidor/desligar_ocioso.py) e a página liga ----------
+const LIGAR = (document.querySelector('meta[name="ligar"]') || {}).content || "";
+let ultimoLigar = 0, ultimoMexeu = Date.now(), ultimoAtivo = 0;
+const servidorResponde = () => fetch(API + "/saude", { signal: AbortSignal.timeout(4000) }).then(r => r.ok, () => false);
+function pedirParaLigar() {  // no máximo 1 vez por minuto (a máquina ainda desligando não aceita: pede de novo)
+  if (!LIGAR || Date.now() - ultimoLigar < 60000) return;
+  ultimoLigar = Date.now();
+  fetch(LIGAR, { method: "POST" }).catch(() => {});
+}
+async function acordarServidor() {
+  if (!LIGAR || await servidorResponde()) return;
+  semConexao = true; desenharFaixas();
+  const desde = Date.now();
+  while (Date.now() - desde < 240000 && !(await servidorResponde())) {  // leva 1 a 2 min; 4 min: segue e mostra o erro
+    pedirParaLigar();
+    await new Promise(ok => setTimeout(ok, 3000));
+  }
+  semConexao = false; desenharFaixas();
+}
+// quem está mexendo na página conta como uso (só ler a ficha não faz pedido); aba esquecida aberta não liga a máquina
+for (const ev of ["pointerdown", "keydown"]) document.addEventListener(ev, () => {
+  ultimoMexeu = Date.now();
+  if (semConexao) return pedirParaLigar();
+  if (API && sessao && Date.now() - ultimoAtivo > 240000) { ultimoAtivo = Date.now(); fetch(API + "/ativo", { method: "POST", headers: comSessao() }).catch(() => {}); }
+}, { passive: true });
+
 async function atualizarEstado() {
   let r;
   try { r = await api("/api/estado?desde=" + logLinhas.length); }
-  catch { semConexao = true; desenharFaixas(); desenharInicio(); return; }
+  catch {
+    semConexao = true; desenharFaixas(); desenharInicio();
+    if (!document.hidden && Date.now() - ultimoMexeu < 120000) pedirParaLigar();  // alguém aqui agora: liga a máquina
+    return;
+  }
   semConexao = false;
   const antes = est, primeira = antes.ia_lidas === undefined, etapaAntes = etapaAtual().atualN;
   logLinhas.push(...r.log);
@@ -2101,7 +2194,7 @@ async function atualizarEstado() {
 // O escritório muda aqui mesmo e grava pela barra "Salvar alterações". As regras de como o robô identifica cada processo
 // são do administrador do Autus (no servidor) ou de quem instala (no modo local).
 let rotulos = [], partes = [], dicionario = [], haMudancas = false;
-const veAvancado = () => !cfg.servidor || souAdmin;
+const veAvancado = () => true;  // escolha do usuário em 13/11: o escritório vê e ajusta tudo
 function desenharConfig() {
   qrMostrado = null;
   encher($("#config-conteudo"),
@@ -2173,8 +2266,8 @@ function cfgAvancado() {
   return [
     h("section", { class: "card card-p col g-20", "aria-labelledby": "aj-sabe" },
       h("div", { class: "col g-4" },
-        h("div", { class: "row wrap" }, h("h2", { class: "h2", id: "aj-sabe" }, "O que o robô sabe"), cfg.servidor ? h("span", { class: "bd bd-ac" }, "Só o administrador vê") : null),
-        h("p", { class: "t-sm t-2" }, "Regras que o robô usa para identificar cada processo. " + (cfg.servidor ? "O escritório não vê esta parte." : "Mexa só se souber o que está fazendo."))),
+        h("div", { class: "row wrap" }, h("h2", { class: "h2", id: "aj-sabe" }, "O que o robô sabe"), null),
+        h("p", { class: "t-sm t-2" }, "Regras que o robô usa para identificar cada processo. Mexa só se souber o que está fazendo.")),
       grupoDeRegras("Assunto pelo texto da inicial", "Quando todas as palavras de uma regra aparecem na inicial, o robô usa o assunto e a matéria dela. Vale a primeira que servir; maiúscula e acento não importam. Separe as palavras com ponto e vírgula.",
         listaDeRegras(dicionario, [["frases", "Palavras na inicial", { placeholder: "ex.: dano moral; banco" }],
           ["assunto", "Assunto (código - nome)", { placeholder: "ex.: 10433 - Indenização por Dano Moral" }], ["materia", "Matéria", { opcoesPje: materias }]],
@@ -2956,7 +3049,7 @@ async function desenharPedidos(atual) {
       h("div", { class: "col grow g-2 min-220" }, h("span", { class: "b" }, p.nome || p.email),
         h("span", { class: "t-sm t-2" }, `${p.nome ? p.email + " · " : ""}pediu ${quandoCurto(p.quando).toLowerCase()}`)),
       h("div", { class: "row wrap g-8" }, h("label", { class: "sr", for: "rq-" + i }, `Escritório para ${p.nome || p.email}`), qual, liberar,
-        h("button", { class: "btn btn-g", type: "button", onclick: () => confirm(`Recusar o pedido de ${p.email}?`)
+        h("button", { class: "btn btn-g", type: "button", onclick: async () => await confirmar(`Recusar o pedido de ${p.email}?`, "A pessoa não entra no Autus. Se ela pedir de novo, o pedido volta para esta lista.", "Recusar", true)
           && agir("/admin/pedidos/recusar", { email: p.email }, `Pedido de ${p.email} recusado.`) }, "Recusar")));
   };
   encher($("#admin-conteudo"), pedidosAdmin.length ? h("div", { class: "col g-12 max-900" },
@@ -3054,7 +3147,7 @@ async function desenharRegistro(atual) {
     : h("div", { class: "max-900" }, vazioAdmin("clock", "Nada registrado ainda", "Cada vez que um administrador abre um escritório, libera ou retira um acesso, fica anotado aqui.")));
 }
 async function retirarEmail(e, email) {
-  if (!confirm(`Retirar ${email} do escritório ${e.nome}? A pessoa perde o acesso na hora.`)) return;
+  if (!await confirmar(`Retirar ${email} do ${e.nome}?`, "A pessoa perde o acesso na hora.", "Retirar o acesso", true)) return;
   try { await api("/admin/escritorios/" + encodeURIComponent(e.id) + "/emails", { retirar: [email] }); informar(`${email} não entra mais no ${e.nome}.`); desenharAdmin(); }
   catch (x) { avisar(x.message); }
 }
@@ -3352,6 +3445,7 @@ $("#tema").addEventListener("click", () => {
 desenharInicio();  // a saudação já aparece enquanto o resto carrega
 (async () => {
   if (location.pathname === "/nova-senha") return desenharNovaSenha();
+  await acordarServidor();
   try { await carregarEscritorio(); }
   catch (e) {
     if (!$("#tela-entrar").hidden) return;  // servidor sem sessão: fica na tela de entrar

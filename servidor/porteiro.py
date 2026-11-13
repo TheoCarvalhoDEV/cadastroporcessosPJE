@@ -27,6 +27,8 @@ ARQUIVO_ESCRITORIOS = os.path.join(RAIZ, "escritorios.json")
 ARQUIVO_ENCERRADAS = os.path.join(RAIZ, "sessoes_encerradas.json")  # quem clicou em Sair: a chave não vale mais
 ARQUIVO_AUDITORIA = os.path.join(RAIZ, "auditoria.jsonl")  # tudo o que um administrador faz (e em qual escritório)
 ARQUIVO_PEDIDOS = os.path.join(RAIZ, "pedidos_acesso.json")  # quem entrou com o Google e ainda não foi liberado
+ARQUIVO_USO = os.path.join(RAIZ, "ultimo_uso")  # desligar_ocioso.py desliga a máquina 30 min depois do último uso
+NAO_E_USO = ("/saude", "/api/estado")  # a página consulta sozinha a cada segundo: aba esquecida aberta não é uso
 GOOGLE_CLIENT = os.environ.get("ROBO_GOOGLE_CLIENT", "")  # ID do cliente OAuth do botão "Fazer login com o Google"
 MAX_PEDIDOS = 300  # a lista de pedidos não cresce sem fim (qualquer conta Google pode pedir)
 LIGAR_ESCRITORIO = ["sudo", "-n", "/usr/local/sbin/autus-ligar-escritorio"]  # ligar_escritorio.sh, dono root
@@ -186,6 +188,15 @@ def mesma_origem():
         return ("", 204) if origem in ORIGENS else abort(403)
     if request.method == "POST" and origem and origem not in ORIGENS:
         abort(403)
+    if request.path not in NAO_E_USO:
+        with open(ARQUIVO_USO, "a"):
+            os.utime(ARQUIVO_USO)  # alguém está usando: a máquina não desliga
+
+
+@app.post("/ativo")
+def ativo():
+    """A página avisa que a pessoa está mexendo (lendo a ficha não faz pedido nenhum): conta como uso."""
+    return jsonify(ok=True)
 
 
 @app.after_request

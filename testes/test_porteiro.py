@@ -119,6 +119,20 @@ def test_qr_do_autenticador_so_logo_depois_de_entrar():
         assert web.get("/api/eco", headers=ana).status_code == 200  # o resto continua
 
 
+def test_uso_para_a_maquina_desligar_sozinha():
+    """Cada pedido da página conta como uso (desligar_ocioso.py lê ultimo_uso), menos a consulta automática do estado:
+    aba esquecida aberta não segura a máquina ligada."""
+    gravar_escritorios(teste={"nome": "Teste", "porta": servidor.server_port, "emails": ["ana@x.com"]})
+    web = porteiro.app.test_client()
+    ana = chave(web, "ana@x.com")
+    os.utime(porteiro.ARQUIVO_USO, (1, 1))
+    web.get("/api/estado", headers=ana)
+    web.get("/saude")
+    assert os.path.getmtime(porteiro.ARQUIVO_USO) == 1
+    assert web.post("/ativo", headers=ana).status_code == 200  # a pessoa mexeu na página (só lendo a ficha)
+    assert os.path.getmtime(porteiro.ARQUIVO_USO) > 1
+
+
 def test_pagina_no_firebase_hosting():
     """Com ROBO_SITE, a página fica em https://<site>.web.app: só ela chama o servidor de fora (CORS), e quem chega
     pelo endereço do servidor vai para lá (com o caminho e o código do e-mail de criar senha)."""

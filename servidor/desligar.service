@@ -1,0 +1,8 @@
+# Desliga a máquina quando ninguém usa o Autus há 30 minutos (chamado por desligar.timer; ligar.py liga de novo)
+[Unit]
+Description=Desliga a máquina do Autus quando ninguém usa há 30 minutos
+
+[Service]
+Type=oneshot
+Environment=ROBO_RAIZ=/srv/robo
+ExecStart=/srv/robo/venv/bin/python /srv/robo/codigo/servidor/desligar_ocioso.py

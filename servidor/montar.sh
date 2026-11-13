@@ -49,13 +49,14 @@ CHAVE=$(grep -s '^ROBO_CHAVE_SESSAO=' $RAIZ/porteiro.env | cut -d= -f2- || true)
 SITE=${3:-$(grep -s '^ROBO_SITE=' $RAIZ/porteiro.env | cut -d= -f2- || true)}  # sem o 3º argumento, mantém o que tinha
 SITE=${SITE:-autus}
 GOOGLE=$(grep -s '^ROBO_GOOGLE_CLIENT=' $RAIZ/porteiro.env | cut -d= -f2- || true)  # botão "Fazer login com o Google"
-printf 'ROBO_RAIZ=%s\nFIREBASE_API_KEY=%s\nROBO_CHAVE_SESSAO=%s\nROBO_SITE=%s\nROBO_API=https://%s\nROBO_GOOGLE_CLIENT=%s\n' \
-  "$RAIZ" "$API_KEY" "$CHAVE" "$SITE" "$DOMINIO" "$GOOGLE" > $RAIZ/porteiro.env
+LIGAR=$(grep -s '^ROBO_LIGAR=' $RAIZ/porteiro.env | cut -d= -f2- || true)  # servidor/ligar.py no Cloud Run
+printf 'ROBO_RAIZ=%s\nFIREBASE_API_KEY=%s\nROBO_CHAVE_SESSAO=%s\nROBO_SITE=%s\nROBO_API=https://%s\nROBO_GOOGLE_CLIENT=%s\nROBO_LIGAR=%s\n' \
+  "$RAIZ" "$API_KEY" "$CHAVE" "$SITE" "$DOMINIO" "$GOOGLE" "$LIGAR" > $RAIZ/porteiro.env
 
 chown -R robo:robo $RAIZ
 chmod 600 $RAIZ/*.env
 systemctl restart caddy
 # copia os serviços, publica a página e reinicia cada robô só quando ele estiver parado (o porteiro por último)
 bash $CODIGO/servidor/atualizar.sh
-systemctl enable --now porteiro limpar.timer
+systemctl enable --now porteiro limpar.timer desligar.timer
 echo "Pronto: https://$DOMINIO"
