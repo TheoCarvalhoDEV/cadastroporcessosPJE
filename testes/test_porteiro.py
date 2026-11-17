@@ -128,6 +128,8 @@ def test_uso_para_a_maquina_desligar_sozinha():
     os.utime(porteiro.ARQUIVO_USO, (1, 1))
     web.get("/api/estado", headers=ana)
     web.get("/saude")
+    web.get("/C:/Program Files/Git/saude")  # o teste de "no ar" do Google com o caminho estragado pelo Git Bash
+    web.post("/ativo")  # sem ter entrado (robô da internet)
     assert os.path.getmtime(porteiro.ARQUIVO_USO) == 1
     assert web.post("/ativo", headers=ana).status_code == 200  # a pessoa mexeu na página (só lendo a ficha)
     assert os.path.getmtime(porteiro.ARQUIVO_USO) > 1

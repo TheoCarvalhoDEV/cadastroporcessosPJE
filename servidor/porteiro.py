@@ -188,7 +188,8 @@ def mesma_origem():
         return ("", 204) if origem in ORIGENS else abort(403)
     if request.method == "POST" and origem and origem not in ORIGENS:
         abort(403)
-    if request.path not in NAO_E_USO:
+    # só conta pedido de quem entrou: robôs da internet e o teste de "no ar" do Google não seguram a máquina ligada
+    if request.path not in NAO_E_USO and ler_sessao():
         with open(ARQUIVO_USO, "a"):
             os.utime(ARQUIVO_USO)  # alguém está usando: a máquina não desliga
 
