@@ -2260,8 +2260,20 @@ function pedirParaLigar() {  // no máximo 1 vez por minuto (a máquina ainda de
   ultimoLigar = Date.now();
   fetch(LIGAR, { method: "POST" }).catch(() => {});
 }
+// abrir a página (ou o Chrome reabrir a aba sozinho) não liga a máquina: ela só liga quando a pessoa aperta o botão
+function esperarBotaoLigar() {
+  return new Promise(ok => {
+    const d = h("dialog", { class: "dlg", "aria-labelledby": "dlg-t" }, h("form", { method: "dialog", class: "col dlg-corpo" },
+      h("h2", { class: "h2", id: "dlg-t" }, "O Autus está desligado"),
+      h("p", { class: "t-2" }, "Para não gastar, a máquina do robô fica desligada até você pedir. Ela leva 1 a 2 minutos para ligar e se desliga sozinha depois de 30 minutos sem uso."),
+      h("div", { class: "row wrap dlg-botoes" }, h("button", { class: "btn btn-p", value: "sim" }, ic("play"), "Ligar o Autus"))));
+    d.addEventListener("close", () => d.returnValue === "sim" ? (d.remove(), ok()) : d.showModal());  // Esc não liga nem some
+    document.body.append(d); d.showModal();
+  });
+}
 async function acordarServidor() {
   if (!LIGAR || await servidorResponde()) return;
+  await esperarBotaoLigar();
   semConexao = true; desenharFaixas();
   const desde = Date.now();
   while (Date.now() - desde < 240000 && !(await servidorResponde())) {  // leva 1 a 2 min; 4 min: segue e mostra o erro
